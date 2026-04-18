@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Générateur Google Dorks — Célérys OSINT</title>
+  <meta name="description" content="Construisez des requêtes Google Dorks avancées avec opérateurs site:, filetype:, inurl: et plus." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'" />
+  <link rel="stylesheet" href="../css/variables.css" />
+  <link rel="stylesheet" href="../css/reset.css" />
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/components.css" />
+  <link rel="stylesheet" href="../css/tools.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2307090D'/><text y='22' x='5' font-size='20' fill='%2300F5B4'>⬡</text></svg>" />
+  <meta name="theme-color" content="#07090D" />
+  <style>
+    .dork-preview {
+      background: var(--clr-bg-2);
+      border: 1px solid var(--clr-primary);
+      border-radius: var(--radius-md);
+      padding: var(--sp-4);
+      font-family: var(--font-mono);
+      font-size: var(--fs-sm);
+      color: var(--clr-primary);
+      word-break: break-all;
+      line-height: var(--lh-loose);
+      min-height: 60px;
+    }
+    .template-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-2);
+    }
+    .template-btn {
+      text-align: left;
+      padding: var(--sp-3);
+      background: var(--clr-bg-3);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .template-btn:hover {
+      border-color: var(--clr-primary);
+      background: var(--clr-primary-dim);
+    }
+    .template-btn__name {
+      font-family: var(--font-mono);
+      font-size: var(--fs-xs);
+      color: var(--clr-text);
+      display: block;
+      margin-bottom: 3px;
+    }
+    .template-btn__preview {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--clr-text-dim);
+      display: block;
+    }
+    .op-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-2);
+    }
+    .op-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 3px var(--sp-2);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius-sm);
+      color: var(--clr-primary);
+      background: var(--clr-primary-dim);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+    }
+    .op-tag:hover {
+      border-color: var(--clr-primary);
+      box-shadow: 0 0 8px rgba(0,245,180,0.2);
+    }
+    .saved-dork {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sp-3);
+      padding: var(--sp-3);
+      background: var(--clr-bg-3);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius-md);
+      transition: border-color var(--dur-fast);
+    }
+    .saved-dork:hover { border-color: var(--clr-border-hover); }
+    .saved-dork__query {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: var(--fs-xs);
+      color: var(--clr-text);
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <header role="banner">
+    <nav class="nav scrolled" aria-label="Navigation principale">
+      <div class="container nav__inner">
+        <a href="../index.html" class="nav__logo">Célérys<span class="text-primary">OSINT</span></a>
+        <ul class="nav__links" role="list">
+          <li><a href="../index.html#outils" class="nav__link">Outils</a></li>
+          <li><a href="../pages/guide.html" class="nav__link">Guide</a></li>
+          <li><a href="../index.html#outils" class="nav__cta">Explorer →</a></li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main-content" class="tool-page">
+    <div class="tool-breadcrumb">
+      <div class="container tool-breadcrumb__inner">
+        <a href="../index.html">Accueil</a>
+        <span class="tool-breadcrumb__sep">/</span>
+        <a href="../index.html#outils">Outils</a>
+        <span class="tool-breadcrumb__sep">/</span>
+        <span>Générateur Google Dorks</span>
+      </div>
+    </div>
+
+    <div class="tool-header">
+      <div class="container">
+        <div class="tool-header__meta">
+          <span class="tool-header__category">Dorks</span>
+          <span class="tool-header__badge-free">Gratuit · Local</span>
+        </div>
+        <h1>Générateur Google Dorks</h1>
+        <p>Construisez des requêtes Google avancées avec les opérateurs <code class="code-inline">site:</code>, <code class="code-inline">filetype:</code>, <code class="code-inline">inurl:</code>, <code class="code-inline">intitle:</code> et plus. Utilisez les templates pour démarrer rapidement.</p>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="tool-layout">
+        <aside>
+          <div class="tool-panel">
+            <div class="tool-panel__header">
+              <span class="tool-panel__dot tool-panel__dot--red"></span>
+              <span class="tool-panel__dot tool-panel__dot--yellow"></span>
+              <span class="tool-panel__dot tool-panel__dot--green"></span>
+              <span class="tool-panel__title">google-dorker.sh</span>
+            </div>
+            <div class="tool-panel__body">
+
+              <div class="form-group">
+                <label class="form-label" for="op-site">site:</label>
+                <input type="text" class="form-input" id="op-site" placeholder="example.com" oninput="buildDork()" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="op-filetype">filetype:</label>
+                <input type="text" class="form-input" id="op-filetype" placeholder="pdf, env, sql, xlsx..." oninput="buildDork()" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="op-inurl">inurl:</label>
+                <input type="text" class="form-input" id="op-inurl" placeholder="admin, login, config..." oninput="buildDork()" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="op-intitle">intitle:</label>
+                <input type="text" class="form-input" id="op-intitle" placeholder="index of, admin panel..." oninput="buildDork()" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="op-intext">intext:</label>
+                <input type="text" class="form-input" id="op-intext" placeholder="password, secret, api_key..." oninput="buildDork()" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="op-ext">ext:</label>
+                <input type="text" class="form-input" id="op-ext" placeholder="bak, log, conf..." oninput="buildDork()" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="op-custom">Termes libres</label>
+                <input type="text" class="form-input" id="op-custom" placeholder="\"mot exact\" OR autre" oninput="buildDork()" />
+              </div>
+
+              <div style="display:flex;gap:var(--sp-2)">
+                <button class="btn-run" style="flex:1" onclick="searchGoogle()">
+                  <span>🔍 Rechercher</span>
+                </button>
+                <button class="btn btn--outline" onclick="saveDork()" style="font-size:var(--fs-xs)">💾 Sauver</button>
+              </div>
+              <button class="btn btn--outline" style="width:100%;justify-content:center;font-size:var(--fs-xs)" onclick="clearAll()">
+                Réinitialiser
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <section aria-live="polite" aria-label="Dorks construits">
+          <div class="tool-results" id="results">
+
+            <!-- Preview en direct -->
+            <div class="result-block">
+              <div class="result-block__header">
+                <span class="result-block__title">// Aperçu en direct</span>
+                <button class="result-block__copy" onclick="copyDork()">Copier</button>
+              </div>
+              <div class="result-block__body">
+                <div class="dork-preview" id="dork-preview">// Remplissez les champs pour construire votre dork...</div>
+                <div style="margin-top:var(--sp-3);display:flex;gap:var(--sp-2)">
+                  <a id="search-link" href="#" target="_blank" rel="noopener noreferrer"
+                     class="btn btn--primary" style="flex:1;justify-content:center;font-size:var(--fs-xs)">
+                    Rechercher sur Google ↗
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- Opérateurs rapides -->
+            <div class="result-block">
+              <div class="result-block__header">
+                <span class="result-block__title">// Opérateurs rapides</span>
+              </div>
+              <div class="result-block__body">
+                <p style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--clr-text-muted);margin-bottom:var(--sp-3)">Cliquez pour ajouter dans les termes libres :</p>
+                <div class="op-grid">
+                  ${[
+                    '"index of /"', '"admin"', '"login"', '"password"',
+                    '"api_key"', '"secret"', '"config"', '"backup"',
+                    '"-admin -login"', '"site:pastebin.com"', '"cache:"',
+                    '"before:2023"', '"after:2020"', 'OR', 'AND', '-'
+                  ].map(op => `<button class="op-tag" onclick="addOp('${op}')">${op}</button>`).join('')}
+                </div>
+              </div>
+            </div>
+
+            <!-- Templates -->
+            <div class="result-block">
+              <div class="result-block__header">
+                <span class="result-block__title">// Templates prêts à l'emploi</span>
+              </div>
+              <div class="result-block__body">
+                <div class="template-grid">
+                  ${[
+                    { name: 'Fichiers .env exposés',    site: '', filetype: 'env', inurl: '', intitle: '', intext: '', ext: '', custom: '' },
+                    { name: 'Admin panels',             site: '', filetype: '', inurl: 'admin', intitle: 'admin', intext: '', ext: '', custom: '' },
+                    { name: 'Docs sensibles',           site: '', filetype: 'pdf', inurl: '', intitle: '', intext: 'confidential', ext: '', custom: '' },
+                    { name: 'Index de répertoire',      site: '', filetype: '', inurl: '', intitle: '"index of /"', intext: '', ext: '', custom: '' },
+                    { name: 'Fichiers de log',          site: '', filetype: '', inurl: '', intitle: '', intext: '', ext: 'log', custom: '' },
+                    { name: 'Clés API dans le code',   site: 'github.com', filetype: '', inurl: '', intitle: '', intext: '"api_key"', ext: '', custom: '' },
+                    { name: 'Backup DB exposés',        site: '', filetype: '', inurl: '', intitle: '', intext: '', ext: 'sql', custom: '"dump"' },
+                    { name: 'Configs WordPress',        site: '', filetype: '', inurl: '', intitle: '', intext: 'DB_PASSWORD', ext: '', custom: '' },
+                  ].map(t => `
+                    <button class="template-btn" onclick='loadTemplate(${JSON.stringify(t)})'>
+                      <span class="template-btn__name">${t.name}</span>
+                      <span class="template-btn__preview">${buildFromObj(t).substring(0, 40)}...</span>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+
+            <!-- Dorks sauvegardés -->
+            <div class="result-block" id="saved-block" style="display:none">
+              <div class="result-block__header">
+                <span class="result-block__title">// Dorks sauvegardés</span>
+                <button class="result-block__copy" onclick="exportSaved()">Exporter</button>
+              </div>
+              <div class="result-block__body">
+                <div id="saved-list" style="display:flex;flex-direction:column;gap:var(--sp-2)"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer__bottom" style="border-top:none;margin-top:0;padding-top:0">
+        <p><a href="../index.html" style="color:var(--clr-primary)">← Retour aux outils</a></p>
+        <p class="mono">© 2026 Célérys OSINT</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    let savedDorks = [];
+
+    function getValues() {
+      return {
+        site:     document.getElementById('op-site').value.trim(),
+        filetype: document.getElementById('op-filetype').value.trim(),
+        inurl:    document.getElementById('op-inurl').value.trim(),
+        intitle:  document.getElementById('op-intitle').value.trim(),
+        intext:   document.getElementById('op-intext').value.trim(),
+        ext:      document.getElementById('op-ext').value.trim(),
+        custom:   document.getElementById('op-custom').value.trim(),
+      };
+    }
+
+    function buildFromObj(v) {
+      const parts = [];
+      if (v.site)     parts.push(`site:${v.site}`);
+      if (v.filetype) parts.push(`filetype:${v.filetype}`);
+      if (v.inurl)    parts.push(`inurl:${v.inurl}`);
+      if (v.intitle)  parts.push(`intitle:${v.intitle}`);
+      if (v.intext)   parts.push(`intext:${v.intext}`);
+      if (v.ext)      parts.push(`ext:${v.ext}`);
+      if (v.custom)   parts.push(v.custom);
+      return parts.join(' ');
+    }
+
+    function buildDork() {
+      const dork = buildFromObj(getValues());
+      const preview = document.getElementById('dork-preview');
+      preview.textContent = dork || '// Remplissez les champs pour construire votre dork...';
+
+      const link = document.getElementById('search-link');
+      if (dork) {
+        link.href = `https://www.google.com/search?q=${encodeURIComponent(dork)}`;
+        link.style.opacity = '1';
+        link.style.pointerEvents = '';
+      } else {
+        link.href = '#';
+        link.style.opacity = '0.4';
+        link.style.pointerEvents = 'none';
+      }
+    }
+
+    function searchGoogle() {
+      const dork = buildFromObj(getValues());
+      if (!dork) return;
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(dork)}`, '_blank');
+    }
+
+    function copyDork() {
+      const dork = buildFromObj(getValues());
+      if (dork) navigator.clipboard.writeText(dork);
+    }
+
+    function addOp(op) {
+      const el = document.getElementById('op-custom');
+      el.value = (el.value + ' ' + op).trim();
+      buildDork();
+    }
+
+    function loadTemplate(t) {
+      document.getElementById('op-site').value     = t.site;
+      document.getElementById('op-filetype').value = t.filetype;
+      document.getElementById('op-inurl').value    = t.inurl;
+      document.getElementById('op-intitle').value  = t.intitle;
+      document.getElementById('op-intext').value   = t.intext;
+      document.getElementById('op-ext').value      = t.ext;
+      document.getElementById('op-custom').value   = t.custom;
+      buildDork();
+    }
+
+    function clearAll() {
+      ['op-site','op-filetype','op-inurl','op-intitle','op-intext','op-ext','op-custom']
+        .forEach(id => document.getElementById(id).value = '');
+      buildDork();
+    }
+
+    function saveDork() {
+      const dork = buildFromObj(getValues());
+      if (!dork || savedDorks.includes(dork)) return;
+      savedDorks.push(dork);
+      renderSaved();
+    }
+
+    function renderSaved() {
+      const block = document.getElementById('saved-block');
+      const list  = document.getElementById('saved-list');
+      block.style.display = savedDorks.length ? 'block' : 'none';
+      list.innerHTML = savedDorks.map((d, i) => `
+        <div class="saved-dork">
+          <span class="saved-dork__query">${escHtml(d)}</span>
+          <div style="display:flex;gap:var(--sp-2);flex-shrink:0">
+            <button class="dork-action result-block__copy" onclick="navigator.clipboard.writeText('${escAttr(d)}')" style="font-family:var(--font-mono);font-size:10px;padding:2px var(--sp-2);border:1px solid var(--clr-border);border-radius:var(--radius-sm);color:var(--clr-text-muted);cursor:pointer;background:none">Copier</button>
+            <a href="https://www.google.com/search?q=${encodeURIComponent(d)}" target="_blank" rel="noopener" class="dork-action result-block__copy" style="font-family:var(--font-mono);font-size:10px;padding:2px var(--sp-2);border:1px solid var(--clr-border);border-radius:var(--radius-sm);color:var(--clr-text-muted);text-decoration:none">↗</a>
+            <button class="result-block__copy" style="font-family:var(--font-mono);font-size:10px;padding:2px var(--sp-2);border:1px solid rgba(255,77,109,0.3);border-radius:var(--radius-sm);color:var(--clr-danger);cursor:pointer;background:none" onclick="removeDork(${i})">✕</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function removeDork(i) {
+      savedDorks.splice(i, 1);
+      renderSaved();
+    }
+
+    function exportSaved() {
+      if (!savedDorks.length) return;
+      navigator.clipboard.writeText(savedDorks.join('\n'));
+    }
+
+    function escHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function escAttr(str) {
+      return String(str).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    }
+
+    // Init
+    buildDork();
+  </script>
+</body>
+</html>

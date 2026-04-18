@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analyseur d'en-têtes Email — Célérys OSINT</title>
+  <meta name="description" content="Analysez les en-têtes bruts d'un email pour tracer son origine et détecter le spoofing." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'" />
+  <link rel="stylesheet" href="../css/variables.css" />
+  <link rel="stylesheet" href="../css/reset.css" />
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/components.css" />
+  <link rel="stylesheet" href="../css/tools.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2307090D'/><text y='22' x='5' font-size='20' fill='%2300F5B4'>⬡</text></svg>" />
+  <meta name="theme-color" content="#07090D" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <header role="banner">
+    <nav class="nav scrolled" aria-label="Navigation principale">
+      <div class="container nav__inner">
+        <a href="../index.html" class="nav__logo" aria-label="Célérys OSINT — Accueil">
+          Célérys<span class="text-primary">OSINT</span>
+        </a>
+        <ul class="nav__links" role="list">
+          <li><a href="../index.html#outils"     class="nav__link">Outils</a></li>
+          <li><a href="../index.html#categories" class="nav__link">Catégories</a></li>
+          <li><a href="../pages/guide.html"       class="nav__link">Guide</a></li>
+          <li><a href="../index.html#outils" class="nav__cta">Explorer →</a></li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main-content" class="tool-page">
+
+    <!-- Breadcrumb -->
+    <div class="tool-breadcrumb">
+      <div class="container tool-breadcrumb__inner">
+        <a href="../index.html">Accueil</a>
+        <span class="tool-breadcrumb__sep">/</span>
+        <a href="../index.html#outils">Outils</a>
+        <span class="tool-breadcrumb__sep">/</span>
+        <span>Analyseur d'en-têtes Email</span>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="tool-header">
+      <div class="container">
+        <div class="tool-header__meta">
+          <span class="tool-header__category">Email</span>
+          <span class="tool-header__badge-free">Gratuit · Local</span>
+        </div>
+        <h1>Analyseur d'en-têtes Email</h1>
+        <p>Collez les en-têtes bruts d'un email pour tracer son chemin SMTP, détecter le spoofing et analyser l'authentification SPF/DKIM/DMARC.</p>
+      </div>
+    </div>
+
+    <!-- Layout -->
+    <div class="container">
+      <div class="tool-layout">
+
+        <!-- Input Panel -->
+        <aside>
+          <div class="tool-panel">
+            <div class="tool-panel__header">
+              <span class="tool-panel__dot tool-panel__dot--red"></span>
+              <span class="tool-panel__dot tool-panel__dot--yellow"></span>
+              <span class="tool-panel__dot tool-panel__dot--green"></span>
+              <span class="tool-panel__title">email-header-analyzer.sh</span>
+            </div>
+            <div class="tool-panel__body">
+              <div class="form-group">
+                <label class="form-label" for="headers-input">En-têtes bruts</label>
+                <textarea class="form-textarea" id="headers-input" rows="12"
+                  placeholder="Collez ici les en-têtes complets de votre email...
+
+Received: from mail.example.com...
+From: sender@example.com
+To: recipient@domain.com
+Subject: Test
+Date: ...
+Authentication-Results: ...
+DKIM-Signature: ..."></textarea>
+                <span class="form-hint">// Outlook : Fichier → Propriétés → En-têtes Internet<br>// Gmail : ⋮ → Afficher la source</span>
+              </div>
+              <button class="btn-run" id="run-btn" onclick="analyzeHeaders()">
+                <div class="spinner"></div>
+                <span class="btn-label">⚡ Analyser les en-têtes</span>
+              </button>
+              <button class="btn btn--outline" style="width:100%;justify-content:center;font-size:var(--fs-xs)" onclick="loadDemo()">
+                Charger un exemple
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Results -->
+        <section aria-live="polite" aria-label="Résultats de l'analyse">
+          <div class="tool-results" id="results">
+            <div class="tool-results__empty" id="empty-state">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
+              <p>// Collez des en-têtes email pour démarrer l'analyse</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer__bottom" style="border-top:none;margin-top:0;padding-top:0">
+        <p><a href="../index.html" style="color:var(--clr-primary)">← Retour aux outils</a></p>
+        <p class="mono">© 2026 Célérys OSINT — Traitement 100% local</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const DEMO_HEADERS = `Delivered-To: user@gmail.com
+Received: by 2002:a05:6000:1000:0:0:0:0 with SMTP id example-smtp;
+        Mon, 15 Apr 2026 08:12:33 -0700 (PDT)
+Received: from mail.suspicious-domain.xyz (mail.suspicious-domain.xyz. [198.51.100.42])
+        by mx.google.com with ESMTP id abc123
+        for <user@gmail.com>;
+        Mon, 15 Apr 2026 08:12:32 -0700 (PDT)
+Received: from internal.corp.example.com (10.0.0.5)
+        by mail.suspicious-domain.xyz with SMTP;
+        Mon, 15 Apr 2026 08:12:28 -0700
+Authentication-Results: mx.google.com;
+       dkim=fail header.i=@example.com;
+       spf=softfail (google.com: domain of sender@example.com does not designate 198.51.100.42 as permitted sender);
+       dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=example.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com; s=selector1;
+From: "John Smith" <john.smith@example.com>
+To: user@gmail.com
+Subject: Important: Verify your account immediately
+Date: Mon, 15 Apr 2026 08:12:25 -0700
+Message-ID: <abc123@suspicious-domain.xyz>
+X-Mailer: PHPMailer 6.0.0
+X-Originating-IP: 198.51.100.42
+Content-Type: text/html; charset=UTF-8`;
+
+    function loadDemo() {
+      document.getElementById('headers-input').value = DEMO_HEADERS;
+    }
+
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copié';
+        setTimeout(() => btn.textContent = orig, 1500);
+      });
+    }
+
+    function parseHeaders(raw) {
+      const lines = raw.split('\n');
+      const headers = {};
+      let current = '';
+
+      for (const line of lines) {
+        if (/^\S/.test(line) && line.includes(':')) {
+          const idx = line.indexOf(':');
+          current = line.substring(0, idx).trim();
+          headers[current] = (headers[current] || []);
+          headers[current].push(line.substring(idx + 1).trim());
+        } else if (current && /^\s/.test(line)) {
+          if (headers[current]) {
+            headers[current][headers[current].length - 1] += ' ' + line.trim();
+          }
+        }
+      }
+      return headers;
+    }
+
+    function extractReceivedHops(raw) {
+      const hops = [];
+      const received = raw.match(/^Received:.+?(?=\n\S|\nReceived:|\n\n|$)/gms) || [];
+
+      received.forEach((hop, i) => {
+        const fromMatch = hop.match(/from\s+(\S+)/i);
+        const byMatch   = hop.match(/by\s+(\S+)/i);
+        const ipMatch   = hop.match(/\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]/);
+        const dateMatch = hop.match(/;\s*(.+)$/m);
+
+        hops.push({
+          hop: received.length - i,
+          from: fromMatch?.[1] || '—',
+          by: byMatch?.[1] || '—',
+          ip: ipMatch?.[1] || null,
+          date: dateMatch?.[1]?.trim() || '—',
+        });
+      });
+      return hops;
+    }
+
+    function checkAuthentication(raw) {
+      const results = {
+        spf: 'inconnu',
+        dkim: 'inconnu',
+        dmarc: 'inconnu',
+      };
+
+      const authResults = raw.match(/Authentication-Results:(.+?)(?=\n\S|\n\n|$)/ms)?.[1] || '';
+
+      if (/spf=pass/i.test(authResults))   results.spf = 'pass';
+      else if (/spf=fail/i.test(authResults))   results.spf = 'fail';
+      else if (/spf=softfail/i.test(authResults)) results.spf = 'softfail';
+      else if (/spf=neutral/i.test(authResults))  results.spf = 'neutral';
+
+      if (/dkim=pass/i.test(authResults))  results.dkim = 'pass';
+      else if (/dkim=fail/i.test(authResults))  results.dkim = 'fail';
+
+      if (/dmarc=pass/i.test(authResults)) results.dmarc = 'pass';
+      else if (/dmarc=fail/i.test(authResults)) results.dmarc = 'fail';
+
+      return results;
+    }
+
+    function statusBadge(val) {
+      const map = {
+        pass: '<span class="status-badge status-badge--ok">pass</span>',
+        fail: '<span class="status-badge status-badge--danger">fail</span>',
+        softfail: '<span class="status-badge status-badge--warn">softfail</span>',
+        neutral: '<span class="status-badge status-badge--neutral">neutral</span>',
+        inconnu: '<span class="status-badge status-badge--neutral">inconnu</span>',
+      };
+      return map[val] || `<span class="status-badge status-badge--neutral">${val}</span>`;
+    }
+
+    function analyzeHeaders() {
+      const raw = document.getElementById('headers-input').value.trim();
+      if (!raw) return;
+
+      const btn = document.getElementById('run-btn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      setTimeout(() => {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+
+        const headers = parseHeaders(raw);
+        const hops    = extractReceivedHops(raw);
+        const auth    = checkAuthentication(raw);
+
+        const from    = headers['From']?.[0] || '—';
+        const to      = headers['To']?.[0] || '—';
+        const subject = headers['Subject']?.[0] || '—';
+        const date    = headers['Date']?.[0] || '—';
+        const msgId   = headers['Message-ID']?.[0] || '—';
+        const mailer  = headers['X-Mailer']?.[0] || headers['User-Agent']?.[0] || '—';
+        const origIp  = headers['X-Originating-IP']?.[0] || '—';
+
+        // Détection spoofing basique
+        const fromDomain  = from.match(/@([\w.-]+)/)?.[1]?.toLowerCase();
+        const msgIdDomain = msgId.match(/@([\w.-]+)/)?.[1]?.toLowerCase();
+        const spoofingAlert = fromDomain && msgIdDomain && fromDomain !== msgIdDomain;
+
+        const allSpfFail = auth.spf === 'fail' || auth.spf === 'softfail';
+        const riskLevel = (spoofingAlert || (allSpfFail && auth.dkim === 'fail'))
+          ? '<span class="status-badge status-badge--danger">⚠ Risque élevé</span>'
+          : (allSpfFail || auth.dkim === 'fail')
+            ? '<span class="status-badge status-badge--warn">⚠ Risque modéré</span>'
+            : '<span class="status-badge status-badge--ok">✓ Semble légitime</span>';
+
+        const results = document.getElementById('results');
+        document.getElementById('empty-state')?.remove();
+
+        results.innerHTML = `
+          <!-- Résumé -->
+          <div class="result-block">
+            <div class="result-block__header">
+              <span class="result-block__title">// Résumé de l'email</span>
+              ${riskLevel}
+            </div>
+            <div class="result-block__body">
+              <table class="result-table">
+                <tr><td>De</td><td><code class="code-inline">${escHtml(from)}</code></td></tr>
+                <tr><td>À</td><td><code class="code-inline">${escHtml(to)}</code></td></tr>
+                <tr><td>Sujet</td><td>${escHtml(subject)}</td></tr>
+                <tr><td>Date</td><td class="mono">${escHtml(date)}</td></tr>
+                <tr><td>Message-ID</td><td><code class="code-inline">${escHtml(msgId)}</code></td></tr>
+                <tr><td>Mailer</td><td><code class="code-inline">${escHtml(mailer)}</code></td></tr>
+                ${origIp !== '—' ? `<tr><td>IP origine</td><td><code class="code-inline">${escHtml(origIp)}</code></td></tr>` : ''}
+              </table>
+              ${spoofingAlert ? `
+                <div style="margin-top:var(--sp-4);padding:var(--sp-4);background:rgba(255,77,109,0.08);border:1px solid rgba(255,77,109,0.25);border-radius:var(--radius-md)">
+                  <p style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--clr-danger)">
+                    ⚠ ALERTE SPOOFING : Le domaine d'expéditeur <strong>${fromDomain}</strong> diffère du domaine Message-ID <strong>${msgIdDomain}</strong>
+                  </p>
+                </div>` : ''}
+            </div>
+          </div>
+
+          <!-- Authentification -->
+          <div class="result-block">
+            <div class="result-block__header">
+              <span class="result-block__title">// Authentification SPF / DKIM / DMARC</span>
+            </div>
+            <div class="result-block__body">
+              <table class="result-table">
+                <tr>
+                  <td>SPF</td>
+                  <td>${statusBadge(auth.spf)}</td>
+                </tr>
+                <tr>
+                  <td>DKIM</td>
+                  <td>${statusBadge(auth.dkim)}</td>
+                </tr>
+                <tr>
+                  <td>DMARC</td>
+                  <td>${statusBadge(auth.dmarc)}</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Hops SMTP -->
+          <div class="result-block">
+            <div class="result-block__header">
+              <span class="result-block__title">// Relais SMTP (${hops.length} hops)</span>
+              <button class="result-block__copy" onclick="copyHops()">Copier</button>
+            </div>
+            <div class="result-block__body">
+              ${hops.length === 0 ? '<p style="color:var(--clr-text-muted);font-family:var(--font-mono);font-size:var(--fs-xs)">Aucun en-tête Received trouvé</p>' : `
+              <table class="result-table">
+                <thead>
+                  <tr>
+                    <th>Hop</th>
+                    <th>De</th>
+                    <th>Par</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${hops.map(h => `
+                    <tr>
+                      <td style="color:var(--clr-primary)">${h.hop}</td>
+                      <td><code class="code-inline">${escHtml(h.from)}</code></td>
+                      <td><code class="code-inline">${escHtml(h.by)}</code></td>
+                      <td>${h.ip ? `<code class="code-inline">${h.ip}</code>` : '—'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>`}
+            </div>
+          </div>
+
+          <!-- En-têtes bruts parsés -->
+          <div class="result-block">
+            <div class="result-block__header">
+              <span class="result-block__title">// Tous les en-têtes parsés</span>
+              <button class="result-block__copy" onclick="copyRaw()">Copier</button>
+            </div>
+            <div class="result-block__body">
+              <div class="code-block" id="raw-headers-output">${Object.entries(headers).map(([k, vs]) =>
+                vs.map(v => `<span style="color:var(--clr-primary)">${escHtml(k)}</span>: ${escHtml(v)}`).join('\n')
+              ).join('\n')}</div>
+            </div>
+          </div>
+        `;
+
+        // Store hops for copy
+        window._hopsData = hops;
+      }, 400);
+    }
+
+    function copyHops() {
+      if (!window._hopsData) return;
+      const text = window._hopsData.map(h => `Hop ${h.hop}: ${h.from} → ${h.by} [${h.ip || 'no IP'}]`).join('\n');
+      navigator.clipboard.writeText(text);
+    }
+
+    function copyRaw() {
+      const el = document.getElementById('raw-headers-output');
+      if (el) navigator.clipboard.writeText(el.innerText);
+    }
+
+    function escHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>

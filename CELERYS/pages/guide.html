@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guide OSINT — Célérys OSINT</title>
+  <meta name="description" content="Guide complet pour débuter en OSINT : méthodologie, outils essentiels, bonnes pratiques et OPSEC." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://votre-pseudo.github.io/osint-hub/pages/guide.html" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap"
+        media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" />
+  </noscript>
+
+  <link rel="stylesheet" href="../css/variables.css" />
+  <link rel="stylesheet" href="../css/reset.css" />
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/components.css" />
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,
+    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>
+      <rect width='32' height='32' rx='6' fill='%2307090D'/>
+      <text y='22' x='5' font-size='20' fill='%2300F5B4'>⬡</text>
+    </svg>" />
+  <meta name="theme-color" content="#07090D" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <header role="banner">
+    <nav class="nav" aria-label="Navigation principale">
+      <div class="container nav__inner">
+        <a href="../index.html" class="nav__logo" aria-label="Célérys OSINT — Accueil">
+          Célérys<span class="text-primary">OSINT</span>
+        </a>
+        <ul class="nav__links" role="list">
+          <li><a href="../index.html#outils"     class="nav__link">Outils</a></li>
+          <li><a href="../index.html#categories" class="nav__link">Catégories</a></li>
+          <li><a href="guide.html"    class="nav__link" aria-current="page">Guide</a></li>
+          <li><a href="apropos.html"  class="nav__link">À propos</a></li>
+          <li><a href="../index.html#outils" class="nav__cta">Explorer →</a></li>
+        </ul>
+        <button class="nav__menu-btn" aria-label="Ouvrir le menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main-content" style="padding-top: var(--nav-height)">
+    <section class="section" aria-labelledby="guide-title">
+      <div class="container" style="max-width: 800px">
+        <div class="reveal" style="margin-bottom: var(--sp-12)">
+          <p class="section__eyebrow">// Documentation</p>
+          <h1 id="guide-title">Guide du débutant OSINT</h1>
+          <p class="section__desc" style="margin-top: var(--sp-4)">
+            Tout ce que vous devez savoir pour commencer une investigation OSINT
+            de manière efficace, légale et sécurisée.
+          </p>
+        </div>
+
+        <article class="reveal">
+          <section aria-labelledby="step1">
+            <h2 id="step1" style="margin-bottom: var(--sp-4); color: var(--clr-primary); font-size: var(--fs-lg)">
+              1. Qu'est-ce que l'OSINT ?
+            </h2>
+            <p style="color: var(--clr-text-muted); line-height: var(--lh-loose); margin-bottom: var(--sp-6)">
+              L'OSINT (Open Source INTelligence) désigne la collecte et l'analyse d'informations
+              provenant de sources accessibles au public : réseaux sociaux, registres publics,
+              bases de données ouvertes, sites web, etc.
+            </p>
+          </section>
+
+          <section aria-labelledby="step2">
+            <h2 id="step2" style="margin-bottom: var(--sp-4); color: var(--clr-primary); font-size: var(--fs-lg)">
+              2. Méthodologie de base
+            </h2>
+            <div class="terminal" style="margin-bottom: var(--sp-6)" aria-label="Étapes de la méthodologie OSINT">
+              <div class="terminal__bar" aria-hidden="true">
+                <span class="terminal__dot terminal__dot--red"></span>
+                <span class="terminal__dot terminal__dot--yellow"></span>
+                <span class="terminal__dot terminal__dot--green"></span>
+                <span class="terminal__title">méthodologie.md</span>
+              </div>
+              <div class="terminal__body">
+                <div class="terminal__line">
+                  <span class="terminal__prompt">1.</span>
+                  <span class="terminal__cmd">Définir la cible et les objectifs</span>
+                </div>
+                <div class="terminal__line">
+                  <span class="terminal__prompt">2.</span>
+                  <span class="terminal__cmd">Collecter les données (passive recon)</span>
+                </div>
+                <div class="terminal__line">
+                  <span class="terminal__prompt">3.</span>
+                  <span class="terminal__cmd">Analyser et croiser les informations</span>
+                </div>
+                <div class="terminal__line">
+                  <span class="terminal__prompt">4.</span>
+                  <span class="terminal__cmd">Documenter et rapporter</span>
+                </div>
+                <div class="terminal__line">
+                  <span class="terminal__prompt">5.</span>
+                  <span class="terminal__cmd">Vérifier les sources (fact-checking)</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section aria-labelledby="step3">
+            <h2 id="step3" style="margin-bottom: var(--sp-4); color: var(--clr-primary); font-size: var(--fs-lg)">
+              3. Outils essentiels pour débuter
+            </h2>
+            <p style="color: var(--clr-text-muted); line-height: var(--lh-loose); margin-bottom: var(--sp-4)">
+              Commencez avec ces outils gratuits avant d'explorer les solutions avancées.
+            </p>
+            <a href="../index.html#outils" class="btn btn--primary">
+              Voir tous les outils →
+            </a>
+          </section>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer__bottom" style="border-top:none;margin-top:0;padding-top:0">
+        <p><a href="../index.html" style="color:var(--clr-primary)">← Retour à l'accueil</a></p>
+        <p class="mono">© 2026 Célérys OSINT</p>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="../js/main.js"></script>
+</body>
+</html>

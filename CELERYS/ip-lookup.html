@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IP Lookup & Géolocalisation — Célérys OSINT</title>
+  <meta name="description" content="Géolocalisez une IP et obtenez ASN, opérateur, fuseau horaire et informations réseau." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'" />
+  <link rel="stylesheet" href="../css/variables.css" />
+  <link rel="stylesheet" href="../css/reset.css" />
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/components.css" />
+  <link rel="stylesheet" href="../css/tools.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2307090D'/><text y='22' x='5' font-size='20' fill='%2300F5B4'>⬡</text></svg>" />
+  <meta name="theme-color" content="#07090D" />
+  <style>
+    .map-preview {
+      width: 100%;
+      height: 260px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--clr-border);
+      overflow: hidden;
+      margin-top: var(--sp-4);
+    }
+    .map-preview iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      filter: invert(0.9) hue-rotate(180deg);
+    }
+    .ip-card {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-3);
+      margin-top: var(--sp-2);
+    }
+    .ip-stat {
+      background: var(--clr-bg-3);
+      border: 1px solid var(--clr-border);
+      border-radius: var(--radius-md);
+      padding: var(--sp-4);
+    }
+    .ip-stat__label {
+      font-family: var(--font-mono);
+      font-size: var(--fs-xs);
+      color: var(--clr-text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: var(--sp-2);
+    }
+    .ip-stat__value {
+      font-family: var(--font-mono);
+      font-size: var(--fs-sm);
+      color: var(--clr-text);
+      word-break: break-all;
+    }
+    .ip-stat__value.primary { color: var(--clr-primary); font-size: var(--fs-md); font-weight: var(--fw-bold); }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <header role="banner">
+    <nav class="nav scrolled" aria-label="Navigation principale">
+      <div class="container nav__inner">
+        <a href="../index.html" class="nav__logo" aria-label="Célérys OSINT — Accueil">
+          Célérys<span class="text-primary">OSINT</span>
+        </a>
+        <ul class="nav__links" role="list">
+          <li><a href="../index.html#outils" class="nav__link">Outils</a></li>
+          <li><a href="../pages/guide.html"  class="nav__link">Guide</a></li>
+          <li><a href="../index.html#outils" class="nav__cta">Explorer →</a></li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main-content" class="tool-page">
+    <div class="tool-breadcrumb">
+      <div class="container tool-breadcrumb__inner">
+        <a href="../index.html">Accueil</a>
+        <span class="tool-breadcrumb__sep">/</span>
+        <a href="../index.html#outils">Outils</a>
+        <span class="tool-breadcrumb__sep">/</span>
+        <span>IP Lookup</span>
+      </div>
+    </div>
+
+    <div class="tool-header">
+      <div class="container">
+        <div class="tool-header__meta">
+          <span class="tool-header__category">Réseau</span>
+          <span class="tool-header__badge-free">Gratuit · API ipapi.co</span>
+        </div>
+        <h1>IP Lookup & Géolocalisation</h1>
+        <p>Géolocalisez n'importe quelle adresse IP ou domaine : pays, ville, opérateur, ASN, fuseau horaire et informations réseau complètes.</p>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="tool-layout">
+        <aside>
+          <div class="tool-panel">
+            <div class="tool-panel__header">
+              <span class="tool-panel__dot tool-panel__dot--red"></span>
+              <span class="tool-panel__dot tool-panel__dot--yellow"></span>
+              <span class="tool-panel__dot tool-panel__dot--green"></span>
+              <span class="tool-panel__title">ip-lookup.sh</span>
+            </div>
+            <div class="tool-panel__body">
+              <div class="form-group">
+                <label class="form-label" for="ip-input">Adresse IP ou domaine</label>
+                <input type="text" class="form-input" id="ip-input"
+                  placeholder="8.8.8.8 ou example.com"
+                  autocomplete="off" spellcheck="false" />
+                <span class="form-hint">// IPv4, IPv6 ou nom de domaine</span>
+              </div>
+              <button class="btn-run" id="run-btn" onclick="lookupIP()">
+                <div class="spinner"></div>
+                <span class="btn-label">⚡ Rechercher</span>
+              </button>
+              <button class="btn btn--outline" style="width:100%;justify-content:center;font-size:var(--fs-xs)" onclick="lookupMyIP()">
+                📍 Ma propre IP
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <section aria-live="polite" aria-label="Résultats IP">
+          <div class="tool-results" id="results">
+            <div class="tool-results__empty" id="empty-state">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+              <p>// Entrez une IP ou un domaine pour commencer</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer__bottom" style="border-top:none;margin-top:0;padding-top:0">
+        <p><a href="../index.html" style="color:var(--clr-primary)">← Retour aux outils</a></p>
+        <p class="mono">© 2026 Célérys OSINT</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('ip-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') lookupIP();
+    });
+
+    async function lookupMyIP() {
+      document.getElementById('ip-input').value = '';
+      await doLookup('');
+    }
+
+    async function lookupIP() {
+      const val = document.getElementById('ip-input').value.trim();
+      await doLookup(val);
+    }
+
+    async function doLookup(target) {
+      const btn = document.getElementById('run-btn');
+      btn.classList.add('loading');
+      btn.disabled = true;
+
+      try {
+        const url = target
+          ? `https://ipapi.co/${encodeURIComponent(target)}/json/`
+          : `https://ipapi.co/json/`;
+
+        const res  = await fetch(url);
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.reason || 'IP introuvable');
+
+        renderResults(data);
+      } catch (err) {
+        renderError(err.message);
+      } finally {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+
+    function renderResults(d) {
+      const results = document.getElementById('results');
+      document.getElementById('empty-state')?.remove();
+
+      const vpnIndicators = d.org?.toLowerCase().includes('vpn') ||
+        d.org?.toLowerCase().includes('proxy') ||
+        d.org?.toLowerCase().includes('hosting');
+
+      const flagUrl = d.country_code
+        ? `https://flagcdn.com/32x24/${d.country_code.toLowerCase()}.png`
+        : '';
+
+      const lat = d.latitude;
+      const lon = d.longitude;
+      const mapUrl = lat && lon
+        ? `https://www.openstreetmap.org/export/embed.html?bbox=${lon-0.1},${lat-0.1},${lon+0.1},${lat+0.1}&layer=mapnik&marker=${lat},${lon}`
+        : null;
+
+      results.innerHTML = `
+        <!-- IP principale -->
+        <div class="result-block">
+          <div class="result-block__header">
+            <span class="result-block__title">// Informations IP</span>
+            ${vpnIndicators ? '<span class="status-badge status-badge--warn">Possible VPN/Proxy</span>' : '<span class="status-badge status-badge--ok">Résidentiel</span>'}
+          </div>
+          <div class="result-block__body">
+            <div style="display:flex;align-items:center;gap:var(--sp-4);margin-bottom:var(--sp-5)">
+              ${flagUrl ? `<img src="${flagUrl}" alt="${d.country_name}" style="border-radius:2px;height:24px">` : ''}
+              <div>
+                <div style="font-family:var(--font-display);font-size:var(--fs-xl);font-weight:var(--fw-black);color:var(--clr-primary)">${d.ip}</div>
+                <div style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--clr-text-muted)">${d.city || '—'}, ${d.region || '—'}, ${d.country_name || '—'}</div>
+              </div>
+            </div>
+            <div class="ip-card">
+              <div class="ip-stat">
+                <div class="ip-stat__label">Pays</div>
+                <div class="ip-stat__value">${d.country_name || '—'} (${d.country_code || '—'})</div>
+              </div>
+              <div class="ip-stat">
+                <div class="ip-stat__label">Ville</div>
+                <div class="ip-stat__value">${d.city || '—'}</div>
+              </div>
+              <div class="ip-stat">
+                <div class="ip-stat__label">Région</div>
+                <div class="ip-stat__value">${d.region || '—'}</div>
+              </div>
+              <div class="ip-stat">
+                <div class="ip-stat__label">Code postal</div>
+                <div class="ip-stat__value">${d.postal || '—'}</div>
+              </div>
+              <div class="ip-stat">
+                <div class="ip-stat__label">Fuseau horaire</div>
+                <div class="ip-stat__value">${d.timezone || '—'}</div>
+              </div>
+              <div class="ip-stat">
+                <div class="ip-stat__label">Coordonnées</div>
+                <div class="ip-stat__value">${d.latitude || '—'}, ${d.longitude || '—'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Réseau -->
+        <div class="result-block">
+          <div class="result-block__header">
+            <span class="result-block__title">// Réseau & Opérateur</span>
+            <button class="result-block__copy" onclick="copyNetInfo()">Copier</button>
+          </div>
+          <div class="result-block__body">
+            <table class="result-table" id="net-table">
+              <tr><td>ASN</td><td><code class="code-inline">${d.asn || '—'}</code></td></tr>
+              <tr><td>Organisation</td><td><code class="code-inline">${d.org || '—'}</code></td></tr>
+              <tr><td>Opérateur</td><td>${d.org || '—'}</td></tr>
+              <tr><td>Version IP</td><td>${d.version || 'IPv4'}</td></tr>
+              <tr><td>Appels restants (API)</td><td>${d.X_Quota_Remaining || 'non disponible'}</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- Carte -->
+        ${mapUrl ? `
+        <div class="result-block">
+          <div class="result-block__header">
+            <span class="result-block__title">// Localisation approximative</span>
+            <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}&zoom=10" target="_blank" rel="noopener noreferrer" class="result-block__copy">OpenStreetMap ↗</a>
+          </div>
+          <div class="result-block__body" style="padding:0">
+            <div class="map-preview">
+              <iframe src="${mapUrl}" title="Carte de localisation IP" loading="lazy"></iframe>
+            </div>
+          </div>
+        </div>` : ''}
+      `;
+
+      window._ipData = d;
+    }
+
+    function renderError(msg) {
+      const results = document.getElementById('results');
+      document.getElementById('empty-state')?.remove();
+      results.innerHTML = `
+        <div class="result-block">
+          <div class="result-block__header">
+            <span class="result-block__title">// Erreur</span>
+            <span class="status-badge status-badge--danger">Échec</span>
+          </div>
+          <div class="result-block__body">
+            <p style="font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--clr-danger)">${msg}</p>
+          </div>
+        </div>`;
+    }
+
+    function copyNetInfo() {
+      if (!window._ipData) return;
+      const d = window._ipData;
+      const text = `IP: ${d.ip}\nPays: ${d.country_name}\nVille: ${d.city}\nASN: ${d.asn}\nOrg: ${d.org}\nCoordonnées: ${d.latitude}, ${d.longitude}`;
+      navigator.clipboard.writeText(text);
+    }
+  </script>
+</body>
+</html>
