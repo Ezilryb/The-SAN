@@ -1,0 +1,158 @@
+/*
+ * assets/css/main.css
+ * ─────────────────────────────────────────────────────────────────
+ * Styles personnalisés NEXUS Intelligence Platform.
+ * Complète Tailwind CDN pour les effets dynamiques, animations,
+ * styles de librairies tierces et classes utilitaires custom.
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+/* ── Variables CSS ────────────────────────────────────────────── */
+:root {
+  --neon:    #00e5ff;
+  --signal:  #ffb300;
+  --threat:  #ff3b57;
+  --clear:   #00c896;
+  --surface: #0c1117;
+  --ink:     #1a2535;
+}
+
+/* ── Cloak Alpine.js ──────────────────────────────────────────── */
+[x-cloak] { display: none !important; }
+
+/* ── Scrollbars slim ──────────────────────────────────────────── */
+::-webkit-scrollbar             { width: 3px; height: 3px; }
+::-webkit-scrollbar-track       { background: #0c1117; }
+::-webkit-scrollbar-thumb       { background: #1a2535; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 229, 255, .25); }
+
+/* ── Grille de fond subtile ───────────────────────────────────── */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(0, 229, 255, .025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, .025) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── Lueurs (glow) ────────────────────────────────────────────── */
+.glow-neon   { box-shadow: 0 0 18px rgba(0, 229, 255, .15); }
+.glow-sm     { box-shadow: 0 0  8px rgba(0, 229, 255, .2);  }
+.glow-threat { box-shadow: 0 0 18px rgba(255, 59, 87, .2);  }
+.text-glow   { text-shadow: 0 0 14px rgba(0, 229, 255, .65); }
+
+/* ── Barre de risque ──────────────────────────────────────────── */
+.risk-bar {
+  height: 2px;
+  background: #1a2535;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+/* ── Carte entité (Explorer) ──────────────────────────────────── */
+.entity-card {
+  transition: background .15s, border-color .15s;
+  border-left: 2px solid transparent;
+}
+.entity-card:hover    { border-left-color: var(--neon); background: rgba(0, 229, 255, .04); }
+.entity-card.selected { border-left-color: var(--neon); background: rgba(0, 229, 255, .07); }
+
+/* ── Item de navigation sidebar ──────────────────────────────── */
+.nav-item {
+  transition: background .15s, color .15s;
+  position: relative;
+}
+.nav-item::before {
+  content: '';
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 2px; height: 0;
+  background: var(--neon);
+  transition: height .2s;
+  border-radius: 0 2px 2px 0;
+}
+.nav-item.active::before   { height: 55%; }
+.nav-item.active           { color: var(--neon); background: rgba(0, 229, 255, .07); }
+.nav-item:hover:not(.active){ background: rgba(255, 255, 255, .04); }
+
+/* ── Point de statut animé ────────────────────────────────────── */
+.status-live {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--clear);
+  box-shadow: 0 0 5px var(--clear);
+  animation: pulse-live 2.2s ease-in-out infinite;
+}
+
+/* ── Badges types d'entité ────────────────────────────────────── */
+.badge-PERSON      { background: rgba(167,139,250,.15); color: #a78bfa; border: 1px solid rgba(167,139,250,.3); }
+.badge-ORG         { background: rgba(0,229,255,.1);    color: #00e5ff; border: 1px solid rgba(0,229,255,.3);   }
+.badge-LOCATION    { background: rgba(0,200,150,.1);    color: #00c896; border: 1px solid rgba(0,200,150,.3);   }
+.badge-EVENT       { background: rgba(255,179,0,.1);    color: #ffb300; border: 1px solid rgba(255,179,0,.3);   }
+.badge-TRANSACTION { background: rgba(255,59,87,.1);    color: #ff3b57; border: 1px solid rgba(255,59,87,.3);   }
+
+/* ── Alertes (bordure gauche colorée) ────────────────────────── */
+.alert-critical { border-left: 3px solid var(--threat); }
+.alert-high     { border-left: 3px solid var(--signal); }
+.alert-medium   { border-left: 3px solid #4a5568;       }
+
+/* ── Transitions de vue ───────────────────────────────────────── */
+.view-enter { animation: fadeSlide .22s ease; }
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* ── Animations globales ──────────────────────────────────────── */
+@keyframes pulse-live {
+  0%, 100% { opacity: 1;   box-shadow: 0 0  5px var(--clear); }
+  50%       { opacity: .6; box-shadow: 0 0 10px var(--clear); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.blink { animation: blink 1.1s step-end infinite; }
+
+/* ── Anneau de risque SVG ─────────────────────────────────────── */
+.risk-ring circle { transition: stroke-dashoffset .5s ease; }
+
+/* ────────────────────────────────────────────────────────────────
+   SURCHARGES LEAFLET (dark mode)
+   ──────────────────────────────────────────────────────────────── */
+.leaflet-popup-content-wrapper {
+  background:    #0c1117    !important;
+  border:        1px solid #1a2535 !important;
+  border-radius: 4px !important;
+  box-shadow:    0 4px 20px rgba(0, 0, 0, .6) !important;
+  color:         #e4ecf4  !important;
+  font-family:   'IBM Plex Mono', monospace !important;
+  font-size:     11px !important;
+  padding:       8px 12px !important;
+}
+.leaflet-popup-content      { margin: 6px 0 !important; }
+.leaflet-popup-tip          { background: #1a2535 !important; }
+.leaflet-popup-close-button { color: #6b7e93 !important; top: 4px !important; right: 6px !important; }
+.leaflet-popup-close-button:hover { color: #e4ecf4 !important; }
+.leaflet-container          { background: #070a0f !important; }
+.leaflet-control-zoom       { border: 1px solid #1a2535 !important; border-radius: 4px !important; }
+.leaflet-control-zoom a     { background: #0c1117 !important; color: #6b7e93 !important; border-color: #1a2535 !important; }
+.leaflet-control-zoom a:hover{ color: var(--neon) !important; }
+.leaflet-control-attribution{ background: rgba(7,10,15,.8) !important; color: #3d556e !important; font-size: 8px !important; }
+.leaflet-control-attribution a { color: #4a6680 !important; }
+
+/* ────────────────────────────────────────────────────────────────
+   SURCHARGES VIS.JS (dark mode)
+   ──────────────────────────────────────────────────────────────── */
+div.vis-tooltip {
+  background:    #0c1117   !important;
+  border:        1px solid #1a2535 !important;
+  border-radius: 4px !important;
+  color:         #e4ecf4   !important;
+  font-family:   'IBM Plex Mono', monospace !important;
+  font-size:     10px !important;
+  padding:       6px 10px !important;
+  box-shadow:    0 4px 16px rgba(0, 0, 0, .5) !important;
+}
+
+/* ── Fond canvas Vis Network ──────────────────────────────────── */
+#nexus-graph canvas { border-radius: 0; }
