@@ -1,0 +1,102 @@
+<!--
+  views/map.html
+  ─────────────────────────────────────────────────────────────────
+  Vue 4 : Analyse Géospatiale (Leaflet.js)
+  La carte est initialisée par js/modules/map.js via app.js.
+  ─────────────────────────────────────────────────────────────────
+-->
+<section
+  x-show="currentView === 'map'"
+  class="view-enter h-full flex flex-col"
+  aria-label="Analyse géospatiale"
+>
+
+  <!-- ── En-tête ────────────────────────────────────────────── -->
+  <div class="flex items-center justify-between px-4 py-2.5 border-b border-ink bg-surface flex-shrink-0">
+    <div>
+      <h1 class="text-[10px] font-mono font-semibold tracking-[.2em] text-gray-300 uppercase">
+        Analyse Géospatiale
+      </h1>
+      <p class="text-[8px] font-mono text-gray-600">
+        <span x-text="geoEntities.length"></span> entités géolocalisées
+      </p>
+    </div>
+
+    <!-- Couches / filtres de carte -->
+    <div
+      class="flex flex-wrap gap-1.5"
+      role="group"
+      aria-label="Couches de la carte"
+    >
+      <template x-for="layer in mapLayers" :key="layer.id">
+        <button
+          @click="toggleLayer(layer.id)"
+          :class="['text-[8px] font-mono px-2 py-1 rounded border transition-all',
+                   layer.on
+                     ? 'border-cyan-700/40 text-cyan-300 bg-cyan-900/15'
+                     : 'border-ink text-gray-600 hover:text-gray-400']"
+          :aria-pressed="layer.on"
+          :aria-label="'Couche ' + layer.label + (layer.on ? ' active' : ' inactive')"
+          x-text="layer.label"
+        ></button>
+      </template>
+    </div>
+  </div>
+
+  <!-- ── Carte Leaflet ──────────────────────────────────────── -->
+  <div class="flex-1 relative">
+
+    <div
+      id="leaflet-map"
+      class="w-full h-full"
+      role="img"
+      aria-label="Carte géospatiale interactive des entités surveillées"
+    ></div>
+
+    <!-- Indicateur de chargement -->
+    <div
+      x-show="mapLoading"
+      class="absolute inset-0 flex items-center justify-center bg-void/80 z-10"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="text-center">
+        <div class="text-[9px] font-mono text-gray-600">
+          <span class="blink" aria-hidden="true">█</span>
+          &nbsp;CHARGEMENT DE LA CARTE…
+        </div>
+        <div class="text-[8px] font-mono text-gray-800 mt-1">Connexion aux tuiles CartoDB</div>
+      </div>
+    </div>
+
+    <!-- Légende des marqueurs (coin bas droite) -->
+    <div
+      class="absolute bottom-4 right-4 bg-surface/90 border border-ink rounded p-2.5
+             backdrop-blur-sm z-10 pointer-events-none"
+      aria-label="Légende des marqueurs de carte"
+    >
+      <div class="text-[7px] font-mono text-gray-700 tracking-[.15em] uppercase mb-1.5">
+        Légende
+      </div>
+      <div class="space-y-1">
+        <div class="flex items-center gap-1.5">
+          <div class="w-2 h-2 rounded-full bg-purple-400" aria-hidden="true"></div>
+          <span class="text-[8px] font-mono text-gray-600">Personnes</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <div class="w-2 h-2 rounded-full bg-cyan-400" aria-hidden="true"></div>
+          <span class="text-[8px] font-mono text-gray-600">Organisations</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <div class="w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true"></div>
+          <span class="text-[8px] font-mono text-gray-600">Lieux</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <div class="w-2 h-2 rounded-full bg-amber-400" aria-hidden="true"></div>
+          <span class="text-[8px] font-mono text-gray-600">Événements</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
