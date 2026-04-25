@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<!--
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║  THE SAN — The Sentiment Analytics Network                    ║
+  ║  Path: the-san/index.html                                     ║
+  ║  Landing page — Hub des outils analytiques                    ║
+  ╚═══════════════════════════════════════════════════════════════╝
+-->
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#03050d" />
+
+  <!-- SEO -->
+  <title>The SAN — Sentiment Analytics Network</title>
+  <meta name="description" content="The Sentiment Analytics Network — Outils d'analyse quantitative pour traders de niche. Cartes de corrélation, macro-économie, matières premières rares." />
+  <meta name="robots" content="index, follow" />
+
+  <!-- Open Graph -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:title"       content="The SAN — Sentiment Analytics Network" />
+  <meta property="og:description" content="Visualisez les corrélations cachées entre matières premières rares et marchés financiers." />
+  <meta property="og:locale"      content="fr_FR" />
+
+  <!-- Preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="./css/style.css" />
+
+  <style>
+    /* ── Page-specific additions ── */
+
+    /* Animated grid background for hero */
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .hero-grid::before {
+      content: '';
+      position: absolute;
+      inset: -50%;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      animation: grid-drift 20s linear infinite;
+    }
+    @keyframes grid-drift {
+      0%   { transform: translate(0, 0); }
+      100% { transform: translate(48px, 48px); }
+    }
+
+    /* Scan line effect on hero */
+    .hero-scanline {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.6), transparent);
+      animation: scanline 6s ease-in-out infinite;
+    }
+    @keyframes scanline {
+      0%   { top: 0%; opacity: 1; }
+      90%  { top: 100%; opacity: 0.3; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* Live ticker */
+    .ticker-bar {
+      background: var(--bg-deep);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 0;
+      overflow: hidden;
+      position: relative;
+    }
+    .ticker-track {
+      display: flex;
+      gap: 48px;
+      animation: ticker-scroll 30s linear infinite;
+      white-space: nowrap;
+      width: max-content;
+    }
+    .ticker-track:hover { animation-play-state: paused; }
+    @keyframes ticker-scroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .ticker-sym { color: var(--text-secondary); font-weight: 500; }
+    .ticker-val { color: var(--text-primary); }
+    .ticker-chg.up   { color: var(--green); }
+    .ticker-chg.down { color: var(--red); }
+    .ticker-sep {
+      color: var(--border);
+      user-select: none;
+    }
+
+    /* Features section */
+    .section-eyebrow {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(22px, 3vw, 32px);
+      font-weight: 700;
+      color: var(--text-primary);
+      text-align: center;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .section-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-align: center;
+      margin-bottom: 48px;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.7;
+    }
+
+    /* How it works */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-top: 48px;
+    }
+    .step-item {
+      background: var(--bg-surface);
+      padding: 28px 24px;
+      transition: var(--transition);
+    }
+    .step-item:hover { background: var(--bg-elevated); }
+    .step-num {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--border);
+      line-height: 1;
+      margin-bottom: 12px;
+      letter-spacing: -0.04em;
+    }
+    .step-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .step-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    /* Stats bar */
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-top: 60px;
+      margin-bottom: 60px;
+    }
+    .metric-item {
+      background: var(--bg-surface);
+      padding: 20px 24px;
+      text-align: center;
+    }
+    .metric-val {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: -0.02em;
+    }
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* CTA section */
+    .cta-section {
+      text-align: center;
+      padding: 80px 24px;
+      position: relative;
+    }
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 70% 80% at 50% 50%, rgba(0,212,255,0.04) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .cta-title {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 4vw, 42px);
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+      line-height: 1.15;
+    }
+    .cta-title .accent { color: var(--cyan); }
+    .cta-sub {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Disclaimer */
+    .disclaimer {
+      background: rgba(255,107,53,0.06);
+      border: 1px solid rgba(255,107,53,0.15);
+      border-radius: var(--radius-md);
+      padding: 12px 20px;
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      max-width: 680px;
+      margin: 0 auto 48px;
+      text-align: center;
+    }
+    .disclaimer strong { color: var(--amber); }
+
+    /* Footer */
+    .page-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0;
+      border-top: 1px solid var(--border);
+      gap: 16px;
+    }
+    .footer-brand {
+      font-family: var(--font-display);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+    }
+    .footer-links {
+      display: flex;
+      gap: 20px;
+    }
+    .footer-link {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      transition: color 0.2s;
+    }
+    .footer-link:hover { color: var(--cyan); }
+    .footer-disclaimer {
+      font-size: 9px;
+      color: var(--text-faint);
+      max-width: 360px;
+      text-align: right;
+      line-height: 1.5;
+    }
+
+    /* Entrance animations */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .hero-eyebrow { animation: fade-up 0.5s ease 0.1s both; }
+    .hero-title   { animation: fade-up 0.5s ease 0.2s both; }
+    .hero-sub     { animation: fade-up 0.5s ease 0.3s both; }
+    .hero-actions { animation: fade-up 0.5s ease 0.4s both; }
+
+    /* Heatmap preview / demo widget */
+    .heatmap-preview {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 3px;
+      padding: 20px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      max-width: 380px;
+      margin: 0 auto;
+      animation: fade-up 0.5s ease 0.5s both;
+    }
+    .preview-cell {
+      aspect-ratio: 1;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      font-weight: 500;
+      transition: transform 0.15s;
+    }
+    .preview-cell:hover { transform: scale(1.15); }
+
+    @media (max-width: 768px) {
+      .page-footer { flex-direction: column; gap: 8px; text-align: center; }
+      .footer-disclaimer { text-align: center; }
+      .metrics-bar { grid-template-columns: repeat(2, 1fr); }
+      .ticker-bar  { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════════
+       NAVBAR
+       ════════════════════════════════════════════════════════════ -->
+  <nav class="navbar" role="navigation" aria-label="Navigation principale">
+    <a href="./index.html" class="nav-brand" aria-label="THE SAN — Accueil">
+      <div class="nav-logo" aria-hidden="true">S</div>
+      <div class="nav-name">The <span>SAN</span></div>
+    </a>
+
+    <div class="nav-links" role="list">
+      <a href="./index.html"            class="nav-link active" role="listitem">Accueil</a>
+      <a href="./correlation-map.html"  class="nav-link"        role="listitem">Correlation Map</a>
+      <a href="#how-it-works"           class="nav-link"        role="listitem">Comment ça marche</a>
+    </div>
+
+    <div class="nav-actions">
+      <div class="nav-status" aria-label="Statut système actif">
+        <div class="status-dot" aria-hidden="true"></div>
+        SYSTÈMES ACTIFS
+      </div>
+      <a href="./correlation-map.html" class="btn-primary" style="text-decoration:none; font-size:10px; padding:7px 16px;">
+        ↗ Lancer l'outil
+      </a>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════════
+       TICKER BAR (démo, valeurs illustratives)
+       ════════════════════════════════════════════════════════════ -->
+  <div class="ticker-bar" aria-hidden="true">
+    <div class="ticker-track" id="ticker-track">
+      <!-- Populated twice for seamless loop -->
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       PAGE WRAPPER
+       ════════════════════════════════════════════════════════════ -->
+  <div class="page-wrapper" style="padding-top: 0;">
+
+    <!-- ── HERO ────────────────────────────────────────────────── -->
+    <section class="hero" aria-label="Présentation de The SAN">
+      <div class="hero-grid" aria-hidden="true">
+        <div class="hero-scanline"></div>
+      </div>
+
+      <div class="hero-eyebrow" aria-hidden="true">
+        <span class="status-dot" style="width:5px;height:5px;"></span>
+        The Sentiment Analytics Network · v1.0
+      </div>
+
+      <h1 class="hero-title">
+        Corrélations<br>
+        <span class="accent">Inter-Actifs</span> en<br>
+        <span class="accent-amber">Temps Réel</span>
+      </h1>
+
+      <p class="hero-sub">
+        Visualisez les corrélations cachées entre matières premières rares, 
+        véhicules électriques, semi-conducteurs et marchés énergétiques.
+        Calculs statistiques Pearson en JS pur.
+      </p>
+
+      <div class="hero-actions">
+        <a href="./correlation-map.html" class="btn-hero-primary" aria-label="Ouvrir la Correlation Map">
+          ⬡ &nbsp;Correlation Map
+        </a>
+        <a href="#how-it-works" class="btn-hero-secondary">
+          → Comment ça marche
+        </a>
+      </div>
+
+      <!-- Mini heatmap preview -->
+      <div class="heatmap-preview" aria-hidden="true" id="preview-heatmap" style="margin-top: 48px;">
+        <!-- JS-populated -->
+      </div>
+    </section>
+
+    <!-- ── METRICS ──────────────────────────────────────────────── -->
+    <div class="metrics-bar" aria-label="Statistiques du réseau">
+      <div class="metric-item">
+        <div class="metric-val">23</div>
+        <div class="metric-label">Actifs Suivis</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">253</div>
+        <div class="metric-label">Paires Calculées</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">35j</div>
+        <div class="metric-label">Fenêtre Max</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">100%</div>
+        <div class="metric-label">JS Pur · Zero Backend</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-val">4</div>
+        <div class="metric-label">Groupes d'Actifs</div>
+      </div>
+    </div>
+
+    <!-- ── OUTILS ───────────────────────────────────────────────── -->
+    <section aria-labelledby="tools-title">
+      <div class="section-eyebrow">Outils analytiques</div>
+      <h2 class="section-title" id="tools-title">La suite <span style="font-family:var(--font-display);color:var(--cyan);">SAN</span></h2>
+      <p class="section-sub">
+        Des instruments de précision pour décrypter les marchés de niche que les plateformes classiques ignorent.
+      </p>
+
+      <div class="tools-grid">
+
+        <!-- Correlation Map — LIVE -->
+        <a href="./correlation-map.html" class="tool-card" aria-label="Ouvrir la Correlation Map">
+          <div class="tool-card-badge badge-live">
+            <span class="status-dot" style="width:5px;height:5px;"></span>
+            Disponible
+          </div>
+          <div class="tool-card-icon" aria-hidden="true">⬡</div>
+          <h3 class="tool-card-title">Sentiment Correlation Map</h3>
+          <p class="tool-card-desc">
+            Heatmap interactive des corrélations Pearson sur 30 jours entre 23 actifs (matières premières, EV, semis, énergie). 
+            Mode démo + clé Alpha Vantage pour données live.
+          </p>
+          <div style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap;">
+            <span style="font-size:9px; color:var(--cyan); background:var(--cyan-dim); padding:2px 8px; border-radius:10px;">Pearson r</span>
+            <span style="font-size:9px; color:var(--text-muted); background:var(--bg-deep); padding:2px 8px; border-radius:10px; border: 1px solid var(--border);">p-value</span>
+            <span style="font-size:9px; color:var(--text-muted); background:var(--bg-deep); padding:2px 8px; border-radius:10px; border: 1px solid var(--border);">Vol. quotidienne</span>
+          </div>
+        </a>
+
+        <!-- Sentiment Flow — SOON -->
+        <div class="tool-card" style="cursor: default;" aria-label="Sentiment Flow — Bientôt disponible">
+          <div class="tool-card-badge badge-soon">Bientôt</div>
+          <div class="tool-card-icon" aria-hidden="true">〜</div>
+          <h3 class="tool-card-title">Sentiment Flow</h3>
+          <p class="tool-card-desc">
+            Analyse de flux de sentiment Reddit / Twitter pour actifs de niche. 
+            Détection de divergences entre momentum social et prix réel.
+          </p>
+        </div>
+
+        <!-- Macro Regime Detector — SOON -->
+        <div class="tool-card" style="cursor: default;" aria-label="Macro Regime Detector — Bientôt disponible">
+          <div class="tool-card-badge badge-soon">Bientôt</div>
+          <div class="tool-card-icon" aria-hidden="true">◈</div>
+          <h3 class="tool-card-title">Macro Regime Detector</h3>
+          <p class="tool-card-desc">
+            Identification automatique du régime macro (risk-on/risk-off, stagflation, reflation) 
+            selon les corrélations inter-marchés en temps réel.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── HOW IT WORKS ─────────────────────────────────────────── -->
+    <section id="how-it-works" aria-labelledby="how-title" style="margin-top: 80px;">
+      <div class="section-eyebrow">Méthodologie</div>
+      <h2 class="section-title" id="how-title">Comment ça marche</h2>
+      <p class="section-sub">
+        Des calculs statistiques rigoureux directement dans votre navigateur. 
+        Sans serveur, sans latence.
+      </p>
+
+      <div class="steps-grid">
+        <div class="step-item">
+          <div class="step-num" aria-hidden="true">01</div>
+          <h3 class="step-title">Sélection des actifs</h3>
+          <p class="step-desc">
+            Choisissez jusqu'à 12 actifs parmi 23 instruments : ETFs de matières premières 
+            (LIT, CPER, URA), actions EV (TSLA, RIVN, NIO), semis (NVDA, SOXX) et énergie (ENPH, NEE).
+          </p>
+        </div>
+        <div class="step-item">
+          <div class="step-num" aria-hidden="true">02</div>
+          <h3 class="step-title">Collecte des données</h3>
+          <p class="step-desc">
+            En mode <strong style="color:var(--cyan)">Démo</strong>, des séries simulées réalistes 
+            (marche aléatoire + dérive). En mode <strong style="color:var(--amber)">Live</strong>, 
+            les prix ajustés réels via Alpha Vantage (25 appels/jour gratuits).
+          </p>
+        </div>
+        <div class="step-item">
+          <div class="step-num" aria-hidden="true">03</div>
+          <h3 class="step-title">Calcul Pearson</h3>
+          <p class="step-desc">
+            Le coefficient de corrélation de Pearson est calculé sur les <em>rendements quotidiens</em> 
+            (pas les prix bruts) pour mesurer la co-évolution réelle. 
+            Fenêtre configurable : 7 à 35 jours ouvrés.
+          </p>
+        </div>
+        <div class="step-item">
+          <div class="step-num" aria-hidden="true">04</div>
+          <h3 class="step-title">Interprétation</h3>
+          <p class="step-desc">
+            Chaque cellule affiche r ∈ [−1, +1], le niveau de signification statistique (p-value, 
+            significativité *** / ** / *), la volatilité et le rendement moyen de chaque actif.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── DISCLAIMER ───────────────────────────────────────────── -->
+    <div class="disclaimer" role="note" style="margin-top: 64px;">
+      <strong>⚠ Avertissement :</strong> The SAN est un outil éducatif et analytique. 
+      Les corrélations historiques ne garantissent pas les performances futures. 
+      Aucun contenu de ce site ne constitue un conseil en investissement.
+      Données fournies à titre indicatif uniquement.
+    </div>
+
+    <!-- ── CTA FINAL ─────────────────────────────────────────────── -->
+    <section class="cta-section" aria-labelledby="cta-title">
+      <h2 class="cta-title" id="cta-title">
+        Prêt à décrypter<br>les <span class="accent">marchés cachés</span> ?
+      </h2>
+      <p class="cta-sub">
+        Aucune installation requise. Lancez directement dans votre navigateur.
+        Mode démo disponible sans clé API.
+      </p>
+      <div class="hero-actions">
+        <a href="./correlation-map.html" class="btn-hero-primary">
+          ⬡ &nbsp;Ouvrir la Correlation Map
+        </a>
+      </div>
+    </section>
+
+    <!-- ── FOOTER ────────────────────────────────────────────────── -->
+    <footer class="page-footer" role="contentinfo">
+      <div class="footer-brand">THE SAN &copy; 2026</div>
+      <div class="footer-links">
+        <a href="./correlation-map.html" class="footer-link">Correlation Map</a>
+        <a href="https://www.alphavantage.co/" target="_blank" rel="noopener noreferrer" class="footer-link">Alpha Vantage API</a>
+        <a href="https://github.com/" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub</a>
+      </div>
+      <div class="footer-disclaimer">
+        Données fournies par Alpha Vantage (mode live) ou générées (mode démo).
+        Aucun conseil financier.
+      </div>
+    </footer>
+
+  </div><!-- /page-wrapper -->
+
+  <script>
+    // ── Ticker bar ─────────────────────────────────────────────────
+    const TICKER_DATA = [
+      { sym: 'LIT',  val: '42.37',  chg: '+1.24%', up: true  },
+      { sym: 'TSLA', val: '184.22', chg: '-0.87%', up: false },
+      { sym: 'NVDA', val: '824.55', chg: '+2.11%', up: true  },
+      { sym: 'GLD',  val: '218.40', chg: '+0.33%', up: true  },
+      { sym: 'CPER', val: '28.15',  chg: '-0.45%', up: false },
+      { sym: 'URA',  val: '31.80',  chg: '+0.98%', up: true  },
+      { sym: 'ENPH', val: '97.60',  chg: '-1.32%', up: false },
+      { sym: 'QQQ',  val: '446.88', chg: '+0.61%', up: true  },
+      { sym: 'SLV',  val: '26.74',  chg: '+0.72%', up: true  },
+      { sym: 'RIVN', val: '10.42',  chg: '-2.15%', up: false },
+      { sym: 'SOXX', val: '196.30', chg: '+1.45%', up: true  },
+      { sym: 'NEE',  val: '72.88',  chg: '+0.19%', up: true  },
+    ];
+
+    const track = document.getElementById('ticker-track');
+    if (track) {
+      // Duplicate for seamless loop
+      const items = [...TICKER_DATA, ...TICKER_DATA];
+      track.innerHTML = items.map(d => `
+        <span class="ticker-item">
+          <span class="ticker-sym">${d.sym}</span>
+          <span class="ticker-val">${d.val}</span>
+          <span class="ticker-chg ${d.up ? 'up' : 'down'}">${d.chg}</span>
+        </span>
+        <span class="ticker-sep" aria-hidden="true">·</span>
+      `).join('');
+    }
+
+    // ── Mini heatmap preview ────────────────────────────────────────
+    const preview = document.getElementById('preview-heatmap');
+    if (preview) {
+      const N = 6;
+      // Simulate a symmetric correlation matrix
+      const seed = [
+        [1.00, 0.72, 0.31, -0.48, 0.55, 0.18],
+        [0.72, 1.00, 0.24, -0.39, 0.61, 0.22],
+        [0.31, 0.24, 1.00,  0.12, 0.29, 0.87],
+        [-0.48,-0.39, 0.12, 1.00, -0.33, 0.07],
+        [0.55, 0.61, 0.29, -0.33, 1.00, 0.41],
+        [0.18, 0.22, 0.87,  0.07, 0.41, 1.00],
+      ];
+      const labels = ['LIT','TSLA','GLD','NIO','NVDA','URA'];
+      let html = '';
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          const r = seed[i][j];
+          let bg;
+          if (i === j) {
+            bg = 'rgba(0,212,255,0.5)';
+          } else if (r > 0) {
+            bg = `rgba(0,212,255,${0.08 + Math.pow(r,0.7) * 0.55})`;
+          } else {
+            bg = `rgba(255,107,53,${0.08 + Math.pow(Math.abs(r),0.7) * 0.55})`;
+          }
+          html += `<div class="preview-cell" style="background:${bg}" title="${labels[i]} vs ${labels[j]}: r=${r.toFixed(2)}">
+            ${i === j ? '●' : r.toFixed(2)}
+          </div>`;
+        }
+      }
+      preview.innerHTML = html;
+    }
+  </script>
+</body>
+</html>
