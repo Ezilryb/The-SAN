@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<!--
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║  THE SAN — Sentiment Flow                                     ║
+  ║  Path: the-san/sentiment-flow.html                            ║
+  ║  Analyse de flux de sentiment Reddit/Twitter                  ║
+  ╚═══════════════════════════════════════════════════════════════╝
+-->
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#03050d" />
+
+  <title>Sentiment Flow — The SAN</title>
+  <meta name="description" content="Analyse de flux de sentiment Reddit/Twitter pour actifs de niche. Détection de divergences entre momentum social et prix réel." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="./css/style.css" />
+
+  <style>
+    /* ── Sentiment Flow — page-specific ── */
+
+    /* ── Score gauge ── */
+    .gauge-ring {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      flex-shrink: 0;
+    }
+    .gauge-ring svg {
+      transform: rotate(-90deg);
+    }
+    .gauge-track {
+      fill: none;
+      stroke: rgba(255,255,255,0.06);
+      stroke-width: 6;
+    }
+    .gauge-fill {
+      fill: none;
+      stroke-width: 6;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1);
+    }
+    .gauge-label {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .gauge-sub {
+      font-size: 7px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin-top: 2px;
+    }
+
+    /* ── Asset row ── */
+    .asset-row {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+    .asset-row::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      border-radius: 2px 0 0 2px;
+      background: var(--row-accent, var(--cyan));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .asset-row:hover {
+      border-color: var(--border-bright);
+      background: var(--bg-elevated);
+    }
+    .asset-row:hover::before { opacity: 1; }
+    .asset-row.selected {
+      border-color: var(--border-bright);
+      background: var(--bg-elevated);
+    }
+    .asset-row.selected::before { opacity: 1; }
+
+    .asset-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .asset-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .asset-icon-big {
+      font-size: 18px;
+    }
+    .asset-sym-big {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .asset-name {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* Sparkline-style bar chart */
+    .mention-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 28px;
+      flex: 1;
+    }
+    .mention-bar {
+      flex: 1;
+      border-radius: 2px 2px 0 0;
+      transition: opacity 0.2s;
+    }
+    .mention-bar:hover { opacity: 0.8; }
+
+    /* Divergence badge */
+    .divergence-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 10px;
+      font-family: var(--font-display);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .div-bullish  { background: rgba(0,255,135,0.12); color: var(--green); border: 1px solid rgba(0,255,135,0.2); }
+    .div-bearish  { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(255,107,53,0.25); }
+    .div-neutral  { background: rgba(255,255,255,0.04); color: var(--text-muted); border: 1px solid var(--border); }
+    .div-alert    { background: rgba(255,61,107,0.12); color: var(--red); border: 1px solid rgba(255,61,107,0.25); }
+    .div-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Metrics strip */
+    .metrics-strip {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .metric-chip {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .mc-val {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .mc-val.up   { color: var(--green); }
+    .mc-val.down { color: var(--red); }
+    .mc-val.warn { color: var(--amber); }
+    .mc-lbl {
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ── Detail pane ── */
+    .detail-pane {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-left: 2px solid var(--cyan);
+      border-radius: var(--radius-lg);
+      padding: 0;
+      overflow: hidden;
+      display: none;
+    }
+    .detail-pane.open { display: block; }
+
+    .detail-pane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-pane-title {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    /* Post feed */
+    .post-feed {
+      max-height: 440px;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .post-card {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      transition: var(--transition);
+    }
+    .post-card:hover { border-color: var(--border-bright); }
+    .post-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .post-source {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 8px;
+    }
+    .src-reddit  { background: rgba(255,107,53,0.15); color: var(--amber); }
+    .src-twitter { background: rgba(0,212,255,0.1);   color: var(--cyan); }
+    .post-time {
+      font-size: 9px;
+      color: var(--text-muted);
+      flex: 1;
+    }
+    .post-sentiment-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .post-text {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+    .post-text strong { color: var(--text-primary); }
+    .post-stats {
+      display: flex;
+      gap: 12px;
+    }
+    .post-stat {
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+    .post-stat span { color: var(--text-secondary); }
+
+    /* Divergence explanation */
+    .divergence-explain {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .div-explain-title {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .div-explain-body {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+    .div-explain-body strong { color: var(--text-primary); }
+
+    /* Chart area */
+    .chart-area {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .chart-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .dual-chart {
+      position: relative;
+      height: 120px;
+    }
+    .dual-chart canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Layout ── */
+    .sf-layout {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .sf-layout { grid-template-columns: 1fr; }
+    }
+
+    .assets-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* ── Source filters ── */
+    .source-filters {
+      display: flex;
+      gap: 6px;
+    }
+    .src-filter {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      cursor: pointer;
+      background: transparent;
+      transition: var(--transition);
+    }
+    .src-filter.active-reddit  { background: rgba(255,107,53,0.12); color: var(--amber); border-color: rgba(255,107,53,0.3); }
+    .src-filter.active-twitter { background: var(--cyan-dim); color: var(--cyan); border-color: var(--border-bright); }
+    .src-filter:not(.active-reddit):not(.active-twitter):hover {
+      border-color: rgba(255,255,255,0.12);
+      color: var(--text-secondary);
+    }
+
+    /* ── Global stats bar ── */
+    .global-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    /* Scan wave animation on data cells */
+    @keyframes scan-wave {
+      0%   { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    .scanning {
+      background: linear-gradient(90deg,
+        var(--bg-surface) 25%,
+        rgba(0,212,255,0.08) 50%,
+        var(--bg-surface) 75%
+      );
+      background-size: 200% 100%;
+      animation: scan-wave 1.5s ease infinite;
+    }
+
+    /* Refresh btn pulse */
+    @keyframes refresh-spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinning { animation: refresh-spin 0.7s linear infinite; display: inline-block; }
+
+    /* Tooltip */
+    [data-tip] {
+      position: relative;
+    }
+    [data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-bright);
+      border-radius: var(--radius-sm);
+      padding: 4px 8px;
+      font-size: 9px;
+      color: var(--cyan);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    /* ── Animations ── */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .page-header    { animation: fade-up 0.4s ease 0.05s both; }
+    .controls-strip { animation: fade-up 0.4s ease 0.1s  both; }
+    .global-stats   { animation: fade-up 0.4s ease 0.15s both; }
+    .sf-layout      { animation: fade-up 0.4s ease 0.2s  both; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar" role="navigation" aria-label="Navigation principale">
+    <a href="./index.html" class="nav-brand" aria-label="THE SAN — Accueil">
+      <div class="nav-logo" aria-hidden="true">S</div>
+      <div class="nav-name">The <span>SAN</span></div>
+    </a>
+    <div class="nav-links" role="list">
+      <a href="./index.html"            class="nav-link"        role="listitem">Accueil</a>
+      <a href="./correlation-map.html"  class="nav-link"        role="listitem">Correlation Map</a>
+      <a href="./sentiment-flow.html"   class="nav-link active" role="listitem">Sentiment Flow</a>
+    </div>
+    <div class="nav-actions" style="display:flex;align-items:center;gap:12px;">
+      <div class="nav-status">
+        <div class="status-dot"></div>
+        <span id="nav-scan-label">SCAN EN COURS</span>
+      </div>
+      <span style="font-size:10px;color:var(--text-muted);" id="nav-last-scan"></span>
+    </div>
+  </nav>
+
+  <div class="page-wrapper" role="main">
+
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <div class="page-eyebrow">Outil · Analyse de Sentiment Social</div>
+      <h1 class="page-title">Sentiment <span>Flow</span></h1>
+      <p class="page-desc">
+        Flux de mentions Reddit &amp; Twitter sur actifs de niche. Détection automatique de divergences
+        entre momentum social et performance prix — signaux de retournement potentiels.
+      </p>
+    </div>
+
+    <!-- CONTROLS STRIP -->
+    <div class="controls-strip" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+      <div class="source-filters" role="group" aria-label="Filtres de source">
+        <button class="src-filter active-reddit"  id="filter-reddit"  aria-pressed="true">
+          🟠 Reddit
+        </button>
+        <button class="src-filter active-twitter" id="filter-twitter" aria-pressed="true">
+          🔵 Twitter/X
+        </button>
+      </div>
+
+      <div class="control-group" style="margin-left:auto;">
+        <label class="control-label" for="sf-window">Fenêtre</label>
+        <select id="sf-window" class="san-select" aria-label="Fenêtre d'analyse">
+          <option value="24">24h</option>
+          <option value="48" selected>48h</option>
+          <option value="72">72h</option>
+          <option value="168">7j</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label class="control-label" for="sf-sort">Trier</label>
+        <select id="sf-sort" class="san-select" aria-label="Critère de tri">
+          <option value="divergence">Divergence ↑</option>
+          <option value="mentions">Mentions ↑</option>
+          <option value="sentiment">Score sent.</option>
+          <option value="alpha">Alphabétique</option>
+        </select>
+      </div>
+
+      <button id="btn-sf-refresh" class="btn-primary" aria-label="Relancer le scan">
+        ⟳ &nbsp;Rafraîchir
+      </button>
+    </div>
+
+    <!-- GLOBAL STATS -->
+    <div class="global-stats" id="global-stats" aria-label="Statistiques globales">
+      <!-- JS populated -->
+    </div>
+
+    <!-- MAIN LAYOUT -->
+    <div class="sf-layout">
+
+      <!-- LEFT: ASSET LIST -->
+      <div class="assets-col" id="assets-col" aria-label="Liste des actifs">
+        <!-- JS populated -->
+      </div>
+
+      <!-- RIGHT: DETAIL PANE -->
+      <aside class="detail-pane" id="detail-pane" aria-live="polite" aria-label="Détail sentiment">
+        <!-- JS populated -->
+      </aside>
+
+    </div>
+
+    <!-- METHOD NOTE -->
+    <div class="method-note" style="margin-top:20px;" role="note">
+      <strong>Méthodologie :</strong>
+      Le <code>Score Sentiment</code> est calculé sur un agrégat pondéré de mentions Reddit (r/wallstreetbets, r/investing, r/stocks, r/EV, r/Uranium) et Twitter/X.
+      La <code>divergence</code> mesure l'écart normalisé entre le Z-score de sentiment social et le rendement prix sur la même fenêtre.
+      Un score de divergence &gt; 1.5σ déclenche une alerte signal.
+      <span style="color:var(--amber)">Mode démo : données simulées reproductibles par actif.</span>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="page-footer" role="contentinfo" style="margin-top:40px;padding-top:20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+      <div class="footer-brand" style="font-family:var(--font-display);font-size:11px;color:var(--text-muted);letter-spacing:.08em;">
+        <a href="./index.html" style="color:inherit;text-decoration:none;">THE SAN</a>
+        &nbsp;·&nbsp; Sentiment Flow &nbsp;·&nbsp; 2026
+      </div>
+      <div style="font-size:9px;color:var(--text-faint);max-width:420px;text-align:right;line-height:1.5;">
+        Outil éducatif uniquement. Les signaux de sentiment ne constituent pas des conseils en investissement.
+        Données simulées en mode démo.
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="./js/stats.js"></script>
+  <script src="./js/api.js"></script>
+
+  <script>
+  /* ═══════════════════════════════════════════════════════════
+     SENTIMENT FLOW ENGINE
+     Simulates realistic social sentiment data with divergence detection
+  ═══════════════════════════════════════════════════════════ */
+
+  const SentimentFlow = (() => {
+
+    /* ─── Asset universe (subset of SAN assets) ─── */
+    const FLOW_ASSETS = [
+      { symbol:'LIT',  label:'Lithium ETF',    icon:'⚡', type:'commodity' },
+      { symbol:'TSLA', label:'Tesla',           icon:'🔋', type:'ev' },
+      { symbol:'NVDA', label:'NVIDIA',          icon:'🖥️', type:'tech' },
+      { symbol:'URA',  label:'Uranium ETF',     icon:'☢️', type:'commodity' },
+      { symbol:'RIVN', label:'Rivian',          icon:'🚙', type:'ev' },
+      { symbol:'ENPH', label:'Enphase',         icon:'☀️', type:'energy' },
+      { symbol:'CPER', label:'Copper ETF',      icon:'🔶', type:'commodity' },
+      { symbol:'NIO',  label:'NIO Inc.',        icon:'🚗', type:'ev' },
+      { symbol:'GLD',  label:'Gold ETF',        icon:'🥇', type:'commodity' },
+      { symbol:'FSLR', label:'First Solar',     icon:'🌞', type:'energy' },
+      { symbol:'SOXX', label:'Semis ETF',       icon:'💻', type:'tech' },
+      { symbol:'QS',   label:'QuantumScape',    icon:'🔬', type:'ev' },
+    ];
+
+    /* ─── PRNG (seeded) ─── */
+    function mulberry32(seed) {
+      return function() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+    function boxMuller(rng) {
+      const u1 = Math.max(1e-10, rng());
+      const u2 = rng();
+      return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    }
+    function seededInt(str) {
+      return str.split('').reduce((a,c) => a + c.charCodeAt(0), 0);
+    }
+
+    /* ─── Generate asset sentiment data ─── */
+    function generateAssetData(asset, windowHours) {
+      const seed = seededInt(asset.symbol) + windowHours * 7;
+      const rng = mulberry32(seed);
+
+      // Base sentiment score [-1, +1]
+      const baseSentiment = (rng() - 0.5) * 1.6;
+      const sentiment = Math.max(-1, Math.min(1, baseSentiment));
+
+      // Mention volume (higher for popular assets)
+      const popularity = { TSLA:3, NVDA:2.8, NIO:2.2, RIVN:1.8, ENPH:1.2,
+                           LIT:1.1, URA:1.4, CPER:0.9, GLD:1.6, FSLR:1.0,
+                           SOXX:1.3, QS:1.7 };
+      const pop = popularity[asset.symbol] || 1;
+      const baseMentions = Math.round((200 + rng() * 800) * pop);
+      const redditShare = 0.35 + rng() * 0.45;
+
+      // Price change (simulated, independent)
+      const priceChange = boxMuller(rng) * 0.025;
+
+      // Divergence: sentiment Z-score vs price return
+      const sentimentZ = sentiment * 2.5 + boxMuller(rng) * 0.4;
+      const priceZ = priceChange / 0.02;
+      const divergence = sentimentZ - priceZ;
+
+      // 24h mention bars (12 bars of 2h each)
+      const bars = [];
+      let runMentions = baseMentions * 0.04;
+      for (let i = 0; i < 14; i++) {
+        const noise = 1 + boxMuller(rng) * 0.4;
+        const spike = rng() > 0.85 ? 2 + rng() * 3 : 1;
+        runMentions = Math.max(2, runMentions * noise * spike);
+        bars.push(Math.round(runMentions));
+      }
+      const maxBar = Math.max(...bars);
+
+      // Sentiment trend (6 points)
+      const sentTrend = [];
+      let s = sentiment - 0.3 + rng() * 0.2;
+      for (let i = 0; i < 8; i++) {
+        s = Math.max(-1, Math.min(1, s + boxMuller(rng) * 0.12));
+        sentTrend.push(s);
+      }
+
+      // Divergence label
+      let divType, divLabel;
+      const absDivg = Math.abs(divergence);
+      if (absDivg > 2.0) {
+        divType = divergence > 0 ? 'div-bullish' : 'div-bearish';
+        divLabel = divergence > 0 ? '🔺 HAUSSIER' : '🔻 BAISSIER';
+      } else if (absDivg > 1.2) {
+        divType = divergence > 0 ? 'div-bullish' : 'div-alert';
+        divLabel = divergence > 0 ? '↑ Bullish' : '↓ Bearish';
+      } else {
+        divType = 'div-neutral';
+        divLabel = '⟷ Neutre';
+      }
+
+      return {
+        ...asset,
+        sentiment,
+        mentions: baseMentions,
+        redditMentions: Math.round(baseMentions * redditShare),
+        twitterMentions: Math.round(baseMentions * (1 - redditShare)),
+        priceChange,
+        divergence,
+        divType,
+        divLabel,
+        bars,
+        maxBar,
+        sentTrend,
+        posts: generatePosts(asset, sentiment, rng),
+      };
+    }
+
+    /* ─── Generate simulated posts ─── */
+    function generatePosts(asset, sentiment, rng) {
+      const bullish = [
+        `<strong>${asset.symbol}</strong> breaking out — volume confirming the move. Watching the 50MA closely.`,
+        `Anyone else loading more <strong>${asset.symbol}</strong>? Fundamentals haven't changed, price is gift-wrapped.`,
+        `<strong>${asset.label}</strong> demand data just dropped. Supply squeeze incoming, this will move fast.`,
+        `The short interest on <strong>${asset.symbol}</strong> is insane. Any catalyst and we squeeze hard.`,
+        `Smart money accumulating <strong>${asset.symbol}</strong> quietly. Charts don't lie.`,
+        `<strong>${asset.symbol}</strong> held key support beautifully. Next leg up confirmed?`,
+      ];
+      const bearish = [
+        `<strong>${asset.symbol}</strong> macro headwinds are real. Managing risk, trimming here.`,
+        `Sold my <strong>${asset.symbol}</strong> position. Risk/reward doesn't make sense at these levels anymore.`,
+        `<strong>${asset.label}</strong> inventory data was terrible. Street still hasn't priced this in.`,
+        `<strong>${asset.symbol}</strong> chart looks like distribution to me. Be careful out there.`,
+        `Rates staying high longer = bad for <strong>${asset.symbol}</strong>. No position here.`,
+        `<strong>${asset.symbol}</strong> management guidance was soft. Downgrading my estimate.`,
+      ];
+      const neutral = [
+        `Interesting setup on <strong>${asset.symbol}</strong>. Waiting for confirmation before entering.`,
+        `<strong>${asset.symbol}</strong> range-bound for weeks. Either direction could break soon.`,
+        `Anyone have updated thesis on <strong>${asset.label}</strong>? Trying to update my model.`,
+        `<strong>${asset.symbol}</strong> correlating weirdly with DXY this week. Macro noise?`,
+      ];
+
+      const pool = sentiment > 0.2 ? [...bullish, ...neutral] :
+                   sentiment < -0.2 ? [...bearish, ...neutral] : neutral;
+
+      const sources = ['reddit','reddit','twitter','reddit','twitter','twitter'];
+      const subs = ['r/wallstreetbets','r/investing','r/stocks','r/EVs','r/uranium','r/stocks'];
+      const times = ['il y a 4 min','il y a 12 min','il y a 23 min','il y a 41 min','il y a 1h','il y a 2h','il y a 3h'];
+
+      const posts = [];
+      const n = 6 + Math.floor(rng() * 4);
+      for (let i = 0; i < n; i++) {
+        const src = sources[i % sources.length];
+        const postSentiment = Math.max(-1, Math.min(1, sentiment + (rng()-0.5)*0.4));
+        posts.push({
+          source: src,
+          sub: src === 'reddit' ? subs[Math.floor(rng()*subs.length)] : '@trader_' + asset.symbol.toLowerCase(),
+          time: times[i % times.length],
+          text: pool[Math.floor(rng() * pool.length)],
+          score: Math.round(50 + rng() * 2000),
+          comments: Math.round(5 + rng() * 150),
+          sentiment: postSentiment,
+        });
+      }
+      return posts;
+    }
+
+    /* ─── State ─── */
+    let state = {
+      assets: [],
+      selected: null,
+      windowHours: 48,
+      showReddit: true,
+      showTwitter: true,
+      sortBy: 'divergence',
+    };
+
+    /* ─── Render global stats ─── */
+    function renderGlobalStats() {
+      const el = document.getElementById('global-stats');
+      if (!el) return;
+      const data = state.assets;
+      const totalMentions = data.reduce((s,a) => s+a.mentions, 0);
+      const avgSentiment = data.reduce((s,a) => s+a.sentiment, 0) / data.length;
+      const alerts = data.filter(a => Math.abs(a.divergence) > 2).length;
+      const bullishCount = data.filter(a => a.sentiment > 0.2).length;
+
+      el.innerHTML = [
+        { val: totalMentions.toLocaleString('fr-FR'), label: 'Mentions totales', cls: '' },
+        { val: (avgSentiment >= 0 ? '+' : '') + avgSentiment.toFixed(2), label: 'Sent. moyen', cls: avgSentiment >= 0 ? 'positive' : 'negative' },
+        { val: alerts, label: 'Alertes divergence', cls: alerts > 0 ? 'negative' : '' },
+        { val: bullishCount + '/' + data.length, label: 'Actifs haussiers', cls: 'positive' },
+        { val: state.windowHours + 'h', label: 'Fenêtre active', cls: '' },
+        { val: (data.filter(a => Math.abs(a.divergence) > 1.2).length), label: 'Signaux actifs', cls: 'positive' },
+      ].map(s => `
+        <div class="stat-card">
+          <div class="stat-card-value ${s.cls}">${s.val}</div>
+          <div class="stat-card-label">${s.label}</div>
+        </div>
+      `).join('');
+    }
+
+    /* ─── Sort assets ─── */
+    function sortedAssets() {
+      const d = [...state.assets];
+      switch (state.sortBy) {
+        case 'divergence': return d.sort((a,b) => Math.abs(b.divergence) - Math.abs(a.divergence));
+        case 'mentions':   return d.sort((a,b) => b.mentions - a.mentions);
+        case 'sentiment':  return d.sort((a,b) => b.sentiment - a.sentiment);
+        case 'alpha':      return d.sort((a,b) => a.symbol.localeCompare(b.symbol));
+        default:           return d;
+      }
+    }
+
+    /* ─── Render sentiment gauge SVG ─── */
+    function gaugeHTML(sentiment, color) {
+      const r = 32;
+      const circ = 2 * Math.PI * r;
+      const pct = (sentiment + 1) / 2;
+      const offset = circ * (1 - pct);
+      return `
+        <div class="gauge-ring" aria-hidden="true">
+          <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle class="gauge-track" cx="40" cy="40" r="${r}" />
+            <circle class="gauge-fill"
+              cx="40" cy="40" r="${r}"
+              stroke="${color}"
+              stroke-dasharray="${circ}"
+              stroke-dashoffset="${offset}"
+            />
+          </svg>
+          <div class="gauge-label" style="color:${color}">
+            ${(sentiment >= 0 ? '+' : '') + sentiment.toFixed(2)}
+            <span class="gauge-sub">SENT.</span>
+          </div>
+        </div>`;
+    }
+
+    /* ─── Render asset row ─── */
+    function renderAssetRow(d) {
+      const sentColor = d.sentiment > 0 ? 'var(--cyan)' : 'var(--amber)';
+      const maxH = 28;
+      const barsHTML = d.bars.map(b => {
+        const h = Math.max(3, Math.round((b / d.maxBar) * maxH));
+        const alpha = 0.3 + (b / d.maxBar) * 0.6;
+        const col = d.sentiment > 0 ? `rgba(0,212,255,${alpha})` : `rgba(255,107,53,${alpha})`;
+        return `<div class="mention-bar" style="height:${h}px;background:${col};" title="${b} mentions"></div>`;
+      }).join('');
+
+      const priceChg = d.priceChange;
+      const priceStr = (priceChg >= 0 ? '+' : '') + (priceChg * 100).toFixed(2) + '%';
+      const priceClass = priceChg >= 0 ? 'up' : 'down';
+
+      const redditVis = state.showReddit ? d.redditMentions.toLocaleString('fr-FR') : '—';
+      const twitterVis = state.showTwitter ? d.twitterMentions.toLocaleString('fr-FR') : '—';
+
+      return `
+        <div class="asset-row" data-symbol="${d.symbol}" style="--row-accent:${sentColor}" role="button" tabindex="0" aria-label="${d.symbol} — Score sentiment ${d.sentiment.toFixed(2)}">
+          ${gaugeHTML(d.sentiment, sentColor)}
+          <div class="asset-info">
+            <div class="asset-header">
+              <span class="asset-icon-big">${d.icon}</span>
+              <span class="asset-sym-big">${d.symbol}</span>
+              <span class="asset-name">${d.label}</span>
+              <div class="divergence-badge ${d.divType}" style="margin-left:auto;">
+                <span class="div-dot"></span>
+                ${d.divLabel}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div class="mention-bars" aria-hidden="true">${barsHTML}</div>
+              <div class="metrics-strip">
+                <div class="metric-chip" data-tip="Mentions totales">
+                  <span class="mc-val">${d.mentions.toLocaleString('fr-FR')}</span>
+                  <span class="mc-lbl">Mentions</span>
+                </div>
+                <div class="metric-chip" data-tip="Reddit mentions">
+                  <span class="mc-val" style="color:var(--amber)">${redditVis}</span>
+                  <span class="mc-lbl">Reddit</span>
+                </div>
+                <div class="metric-chip" data-tip="Twitter/X mentions">
+                  <span class="mc-val" style="color:var(--cyan)">${twitterVis}</span>
+                  <span class="mc-lbl">Twitter</span>
+                </div>
+                <div class="metric-chip" data-tip="Variation prix fenêtre">
+                  <span class="mc-val ${priceClass}">${priceStr}</span>
+                  <span class="mc-lbl">Prix Δ</span>
+                </div>
+                <div class="metric-chip" data-tip="Divergence σ">
+                  <span class="mc-val ${Math.abs(d.divergence) > 1.5 ? 'warn' : ''}">${d.divergence.toFixed(2)}σ</span>
+                  <span class="mc-lbl">Diverg.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    /* ─── Render all asset rows ─── */
+    function renderAssets() {
+      const col = document.getElementById('assets-col');
+      if (!col) return;
+      const sorted = sortedAssets();
+      col.innerHTML = sorted.map(d => renderAssetRow(d)).join('');
+
+      col.querySelectorAll('.asset-row').forEach(row => {
+        const handler = () => openDetail(row.dataset.symbol);
+        row.addEventListener('click', handler);
+        row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') handler(); });
+      });
+
+      if (state.selected) {
+        const selRow = col.querySelector(`[data-symbol="${state.selected}"]`);
+        if (selRow) selRow.classList.add('selected');
+      }
+    }
+
+    /* ─── Render detail pane ─── */
+    function openDetail(symbol) {
+      state.selected = symbol;
+      const d = state.assets.find(a => a.symbol === symbol);
+      if (!d) return;
+
+      const pane = document.getElementById('detail-pane');
+      if (!pane) return;
+      pane.classList.add('open');
+
+      const sentColor = d.sentiment > 0 ? 'var(--cyan)' : 'var(--amber)';
+      const filteredPosts = d.posts.filter(p =>
+        (p.source === 'reddit'  && state.showReddit) ||
+        (p.source === 'twitter' && state.showTwitter)
+      );
+
+      const postsHTML = filteredPosts.map(p => {
+        const sc = p.sentiment > 0.15 ? '#00ff87' : p.sentiment < -0.15 ? 'var(--red)' : 'rgba(255,255,255,0.3)';
+        return `
+          <div class="post-card">
+            <div class="post-meta">
+              <span class="post-source ${p.source === 'reddit' ? 'src-reddit' : 'src-twitter'}">
+                ${p.source === 'reddit' ? '🟠 Reddit' : '🔵 Twitter'}
+              </span>
+              <span class="post-time">${p.sub} · ${p.time}</span>
+              <span class="post-sentiment-dot" style="background:${sc}" title="Sentiment post"></span>
+            </div>
+            <div class="post-text">${p.text}</div>
+            <div class="post-stats">
+              <span class="post-stat">▲ <span>${p.score.toLocaleString('fr-FR')}</span></span>
+              <span class="post-stat">💬 <span>${p.comments}</span></span>
+            </div>
+          </div>`;
+      }).join('');
+
+      let divExplanation = '';
+      const absDivg = Math.abs(d.divergence);
+      if (absDivg > 2) {
+        if (d.divergence > 0) {
+          divExplanation = `<strong>Signal HAUSSIER fort (${d.divergence.toFixed(2)}σ).</strong> Le sentiment social est nettement plus positif que ce que le prix reflète actuellement. Historiquement, ce type de divergence précède souvent une revalorisation du prix — ou une correction du sentiment si les fondamentaux ne suivent pas.`;
+        } else {
+          divExplanation = `<strong>Signal BAISSIER fort (${d.divergence.toFixed(2)}σ).</strong> Le prix a surperformé par rapport au momentum social. Ce découplage peut indiquer un excès de valorisation non soutenu par la conviction des acteurs de marché retail.`;
+        }
+      } else if (absDivg > 1.2) {
+        divExplanation = `<strong>Divergence modérée (${d.divergence.toFixed(2)}σ).</strong> Un écart notable entre sentiment social et performance prix. À surveiller : si la divergence s'amplifie, elle pourrait constituer un signal actionnable.`;
+      } else {
+        divExplanation = `<strong>Alignement correct (${d.divergence.toFixed(2)}σ).</strong> Le sentiment social et le mouvement de prix évoluent dans la même direction. Pas de signal de divergence significatif sur cette fenêtre.`;
+      }
+
+      pane.innerHTML = `
+        <div class="detail-pane-header">
+          <div class="detail-pane-title">
+            ${d.icon} ${d.symbol} — ${d.label}
+          </div>
+          <button class="detail-close-btn" id="detail-pane-close" aria-label="Fermer le panneau">✕</button>
+        </div>
+
+        <div class="chart-area">
+          <div class="chart-title">Évolution sentiment (${state.windowHours}h) vs Prix</div>
+          <canvas id="mini-chart" height="120" aria-label="Graphique sentiment vs prix"></canvas>
+        </div>
+
+        <div class="divergence-explain">
+          <div class="div-explain-title">Analyse de divergence</div>
+          <div class="div-explain-body">${divExplanation}</div>
+        </div>
+
+        <div style="padding:12px 20px;border-top:1px solid var(--border);">
+          <div class="div-explain-title" style="margin-bottom:10px;">Posts récents (${filteredPosts.length})</div>
+        </div>
+        <div class="post-feed" aria-label="Posts récents">
+          ${postsHTML.length ? postsHTML : '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:11px;">Aucun post pour cette sélection de source.</div>'}
+        </div>
+      `;
+
+      document.getElementById('detail-pane-close')?.addEventListener('click', () => {
+        pane.classList.remove('open');
+        state.selected = null;
+        renderAssets();
+      });
+
+      renderMiniChart(d);
+      renderAssets();
+    }
+
+    /* ─── Mini dual-line chart (sentiment vs price) ─── */
+    function renderMiniChart(d) {
+      const canvas = document.getElementById('mini-chart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.offsetWidth || 340;
+      const H = 120;
+      canvas.width = W;
+      canvas.height = H;
+
+      // Sentiment line data
+      const sentData = d.sentTrend;
+      // Price line (simulated correlated but diverging)
+      const seed = seededInt(d.symbol) + 999;
+      const rng = mulberry32(seed);
+      let px = 0;
+      const priceData = sentData.map((s, i) => {
+        px += (rng()-0.5)*0.15 + (s - d.divergence*0.05)*0.04;
+        return px;
+      });
+
+      const n = sentData.length;
+      const padX = 10, padY = 10;
+      const chartW = W - padX*2;
+      const chartH = H - padY*2;
+
+      // Normalise
+      const normalize = arr => {
+        const min = Math.min(...arr), max = Math.max(...arr);
+        const range = max - min || 1;
+        return arr.map(v => (v - min) / range);
+      };
+      const sNorm = normalize(sentData);
+      const pNorm = normalize(priceData);
+
+      const toX = i => padX + (i / (n-1)) * chartW;
+      const toY = v => padY + (1 - v) * chartH;
+
+      // Grid lines
+      ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 3; i++) {
+        const y = padY + (i/3)*chartH;
+        ctx.beginPath(); ctx.moveTo(padX, y); ctx.lineTo(W-padX, y); ctx.stroke();
+      }
+
+      // Fill area under sentiment
+      const sentColor = d.sentiment > 0 ? 'rgba(0,212,255,' : 'rgba(255,107,53,';
+      ctx.beginPath();
+      ctx.moveTo(toX(0), toY(sNorm[0]));
+      for (let i=1;i<n;i++) ctx.lineTo(toX(i), toY(sNorm[i]));
+      ctx.lineTo(toX(n-1), H-padY);
+      ctx.lineTo(toX(0), H-padY);
+      ctx.closePath();
+      ctx.fillStyle = sentColor + '0.08)';
+      ctx.fill();
+
+      // Sentiment line
+      ctx.beginPath();
+      ctx.moveTo(toX(0), toY(sNorm[0]));
+      for (let i=1;i<n;i++) ctx.lineTo(toX(i), toY(sNorm[i]));
+      ctx.strokeStyle = d.sentiment > 0 ? 'rgba(0,212,255,0.9)' : 'rgba(255,107,53,0.9)';
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Price line (dashed)
+      ctx.beginPath();
+      ctx.setLineDash([4,4]);
+      ctx.moveTo(toX(0), toY(pNorm[0]));
+      for (let i=1;i<n;i++) ctx.lineTo(toX(i), toY(pNorm[i]));
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Legend
+      ctx.font = '9px JetBrains Mono, monospace';
+      ctx.fillStyle = d.sentiment > 0 ? 'rgba(0,212,255,0.9)' : 'rgba(255,107,53,0.9)';
+      ctx.fillText('─ Sentiment', padX, padY - 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('- - Prix', padX + 75, padY - 2);
+    }
+
+    /* ─── PRNG re-expose for renderMiniChart ─── */
+    function seededInt(str) {
+      return str.split('').reduce((a,c) => a + c.charCodeAt(0), 0);
+    }
+    function mulberry32(seed) {
+      return function() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    /* ─── Toast ─── */
+    function toast(msg, dur=3000) {
+      const t = document.getElementById('toast');
+      if (!t) return;
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), dur);
+    }
+
+    /* ─── Refresh scan ─── */
+    function refresh(forceMsg = false) {
+      const btn = document.getElementById('btn-sf-refresh');
+      if (btn) {
+        const icon = btn.querySelector('span') || btn;
+        btn.innerHTML = '<span class="spinning">⟳</span> &nbsp;Scan...';
+        btn.disabled = true;
+      }
+
+      setTimeout(() => {
+        state.assets = FLOW_ASSETS.map(a => generateAssetData(a, state.windowHours));
+        renderGlobalStats();
+        renderAssets();
+        if (state.selected) openDetail(state.selected);
+        const now = new Date();
+        document.getElementById('nav-last-scan').textContent =
+          `Scan : ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+        if (btn) {
+          btn.innerHTML = '⟳ &nbsp;Rafraîchir';
+          btn.disabled = false;
+        }
+        if (forceMsg) toast('Données actualisées ✓');
+      }, 900);
+    }
+
+    /* ─── Init ─── */
+    function init() {
+      // Event listeners
+      document.getElementById('btn-sf-refresh')?.addEventListener('click', () => refresh(true));
+
+      document.getElementById('sf-window')?.addEventListener('change', e => {
+        state.windowHours = parseInt(e.target.value);
+        refresh();
+      });
+
+      document.getElementById('sf-sort')?.addEventListener('change', e => {
+        state.sortBy = e.target.value;
+        renderAssets();
+      });
+
+      document.getElementById('filter-reddit')?.addEventListener('click', function() {
+        state.showReddit = !state.showReddit;
+        this.classList.toggle('active-reddit', state.showReddit);
+        this.setAttribute('aria-pressed', state.showReddit ? 'true' : 'false');
+        renderAssets();
+        if (state.selected) openDetail(state.selected);
+      });
+
+      document.getElementById('filter-twitter')?.addEventListener('click', function() {
+        state.showTwitter = !state.showTwitter;
+        this.classList.toggle('active-twitter', state.showTwitter);
+        this.setAttribute('aria-pressed', state.showTwitter ? 'true' : 'false');
+        renderAssets();
+        if (state.selected) openDetail(state.selected);
+      });
+
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+          document.getElementById('detail-pane')?.classList.remove('open');
+          state.selected = null;
+          renderAssets();
+        }
+        if (e.key === 'r' && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT') {
+          refresh(true);
+        }
+      });
+
+      // Initial load
+      refresh();
+    }
+
+    return { init, refresh };
+  })();
+
+  document.addEventListener('DOMContentLoaded', () => SentimentFlow.init());
+  </script>
+
+</body>
+</html>
