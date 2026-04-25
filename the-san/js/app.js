@@ -2,11 +2,12 @@
  * THE SAN — Correlation Map Engine
  * Main application logic for the interactive heatmap
  *
- * v2.2 — Intégration de la validation qualité des données :
- *   • Cellules hachurées pour données suspectes (LOW_VARIANCE, MANY_GAPS, LOW_COVERAGE)
- *   • Badge qualité dans le detail panel
- *   • buildMatrix() passe windowDays à Stats.analyze()
- *   • Tooltip enrichi avec le rapport qualité
+ * v2.3 — Migration des calculs Pearson vers un Web Worker :
+ *   • buildMatrixAsync()  : envoie les données au worker, reçoit la matrice
+ *   • workerInstance()    : singleton du worker avec re-création sur erreur
+ *   • compute()           : affiche la progression paire par paire (MATRIX_PROGRESS)
+ *   • Fallback gracieux   : si les Workers ne sont pas disponibles (file://),
+ *     on retombe sur buildMatrixSync() sans bloquer l'UI
  */
 
 const App = (() => {
@@ -26,6 +27,101 @@ const App = (() => {
   };
 
   const DEFAULT_ASSETS = ['LIT', 'TSLA', 'NVDA', 'GLD', 'URA', 'ENPH', 'CPER', 'QQQ'];
+
+  // ─── Web Worker — singleton avec fallback ─────────────────────────────────
+
+  let _worker     = null;
+  let _workerFail = false;  // true si Workers indisponibles (file://, old browser…)
+
+  /**
+   * Retourne l'instance du worker (la crée si besoin).
+   * En cas d'erreur de création, bascule sur le mode synchrone.
+   */
+  function workerInstance() {
+    if (_workerFail) return null;
+    if (_worker)     return _worker;
+
+    try {
+      _worker = new Worker('./js/workers/stats.worker.js');
+
+      // Erreur non-récupérable (script introuvable, CSP, …)
+      _worker.onerror = (err) => {
+        console.warn('[Worker] Erreur critique — fallback synchrone activé :', err.message);
+        _worker      = null;
+        _workerFail  = true;
+      };
+    } catch (e) {
+      console.warn('[Worker] Impossible de créer le worker — fallback synchrone :', e.message);
+      _workerFail = true;
+      return null;
+    }
+
+    return _worker;
+  }
+
+  /**
+   * Construit la matrice via le Web Worker.
+   * Retourne une Promise résolue avec la matrice ou rejetée en cas d'erreur.
+   *
+   * @param {string[]} assets
+   * @param {Object}   seriesData
+   * @returns {Promise<Object>}
+   */
+  function buildMatrixAsync(assets, seriesData) {
+    return new Promise((resolve, reject) => {
+      const worker = workerInstance();
+
+      // ── Fallback synchrone si pas de worker ─────────────────────────────
+      if (!worker) {
+        try {
+          resolve(buildMatrixSync(assets, seriesData));
+        } catch (e) {
+          reject(e);
+        }
+        return;
+      }
+
+      // ── Labels à passer au worker (pas d'accès à API.ASSETS dans le worker) ──
+      const assetLabels = {};
+      for (const sym of assets) {
+        assetLabels[sym] = API.ASSETS[sym]?.label || sym;
+      }
+
+      // ── Handler de messages du worker ────────────────────────────────────
+      function onMessage(e) {
+        const { type, payload } = e.data;
+
+        if (type === 'MATRIX_PROGRESS') {
+          // Mise à jour de la barre de progression pendant le calcul
+          const pct = Math.round((payload.done / payload.total) * 100);
+          updateLoadingProgress(payload.done, payload.total, `Calcul des corrélations… ${pct}%`);
+          return;
+        }
+
+        // Résultat final ou erreur → on retire le listener dans tous les cas
+        worker.removeEventListener('message', onMessage);
+
+        if (type === 'MATRIX_DONE') {
+          resolve(payload.matrix);
+        } else if (type === 'MATRIX_ERROR') {
+          reject(new Error(payload.error));
+        }
+      }
+
+      worker.addEventListener('message', onMessage);
+
+      // ── Envoi de la tâche au worker ──────────────────────────────────────
+      worker.postMessage({
+        type: 'BUILD_MATRIX',
+        payload: {
+          assets,
+          seriesData,
+          windowDays: state.window,
+          assetLabels,
+        },
+      });
+    });
+  }
 
   // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -69,19 +165,12 @@ const App = (() => {
 
   // ─── Styles qualité injectés dynamiquement ────────────────────────────────
 
-  /**
-   * Injecte les styles CSS pour les cellules de qualité dégradée.
-   * Séparés du style.css principal pour rester modulaires.
-   */
   function injectQualityStyles() {
     if (document.getElementById('san-quality-styles')) return;
 
     const style = document.createElement('style');
     style.id = 'san-quality-styles';
     style.textContent = `
-      /* ── Cellules données suspectes ── */
-
-      /* Hachures SVG encodées en base64 pour LOW_VARIANCE (série plate) */
       .data-cell.quality-low-variance {
         background-image: repeating-linear-gradient(
           45deg,
@@ -92,8 +181,6 @@ const App = (() => {
         ) !important;
         border-color: rgba(255,180,0,0.25) !important;
       }
-
-      /* Pointillés pour MANY_GAPS (trous de liquidité) */
       .data-cell.quality-many-gaps {
         background-image: radial-gradient(
           circle,
@@ -103,8 +190,6 @@ const App = (() => {
         background-size: 6px 6px !important;
         border-color: rgba(255,107,53,0.22) !important;
       }
-
-      /* Grille fine pour LOW_COVERAGE (données insuffisantes) */
       .data-cell.quality-low-coverage {
         background-image:
           linear-gradient(rgba(120,120,180,0.12) 1px, transparent 1px),
@@ -112,87 +197,49 @@ const App = (() => {
         background-size: 6px 6px !important;
         border-color: rgba(120,120,180,0.28) !important;
       }
-
-      /* Badge qualité commun */
       .quality-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 3px 9px;
-        border-radius: 10px;
-        font-size: 9px;
-        font-weight: 700;
-        letter-spacing: .07em;
-        text-transform: uppercase;
-        font-family: var(--fd);
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 3px 9px; border-radius: 10px;
+        font-size: 9px; font-weight: 700; letter-spacing: .07em;
+        text-transform: uppercase; font-family: var(--fd);
       }
-      .quality-badge.ok          { background: var(--posd); color: var(--pos); border: 1px solid rgba(29,219,126,.2); }
-      .quality-badge.warn        { background: rgba(255,180,0,.09); color: #FFB400; border: 1px solid rgba(255,180,0,.22); }
-      .quality-badge.bad         { background: var(--negd); color: var(--neg); border: 1px solid rgba(255,61,88,.22); }
-
-      /* Icône ⚠ superposée sur les cellules suspectes */
+      .quality-badge.ok   { background: var(--posd); color: var(--pos); border: 1px solid rgba(29,219,126,.2); }
+      .quality-badge.warn { background: rgba(255,180,0,.09); color: #FFB400; border: 1px solid rgba(255,180,0,.22); }
+      .quality-badge.bad  { background: var(--negd); color: var(--neg); border: 1px solid rgba(255,61,88,.22); }
       .data-cell[data-quality]:not([data-quality="ok"])::after {
-        content: '⚠';
-        position: absolute;
-        top: 2px;
-        right: 3px;
-        font-size: 7px;
-        opacity: 0.55;
-        pointer-events: none;
+        content: '⚠'; position: absolute; top: 2px; right: 3px;
+        font-size: 7px; opacity: 0.55; pointer-events: none;
       }
       .data-cell { position: relative; }
-
-      /* Score qualité — barre dans le detail panel */
       .quality-score-track {
-        flex: 1;
-        height: 4px;
-        background: var(--bg2);
-        border-radius: 2px;
-        overflow: hidden;
-        border: 1px solid var(--b0);
+        flex: 1; height: 4px; background: var(--bg2);
+        border-radius: 2px; overflow: hidden; border: 1px solid var(--b0);
       }
-      .quality-score-fill {
-        height: 100%;
-        border-radius: 2px;
-        transition: width .9s var(--ease);
-      }
-
-      /* Encadré qualité dans le detail panel */
+      .quality-score-fill { height: 100%; border-radius: 2px; transition: width .9s var(--ease); }
       .quality-panel {
-        background: var(--bg2);
-        border: 1px solid var(--b0);
-        border-radius: var(--r1);
-        padding: 10px 12px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        background: var(--bg2); border: 1px solid var(--b0);
+        border-radius: var(--r1); padding: 10px 12px;
+        display: flex; flex-direction: column; gap: 8px;
       }
       .quality-panel-title {
-        font-size: 8px;
-        font-weight: 700;
-        letter-spacing: .1em;
-        text-transform: uppercase;
-        color: var(--t2);
+        font-size: 8px; font-weight: 700; letter-spacing: .1em;
+        text-transform: uppercase; color: var(--t2);
       }
-      .quality-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 9px;
+      .quality-row { display: flex; align-items: center; gap: 8px; font-size: 9px; }
+      .quality-sym-label { font-family: var(--fd); font-weight: 700; color: var(--t1); width: 40px; flex-shrink: 0; }
+      .quality-detail-text { color: var(--t2); font-size: 9px; line-height: 1.5; flex: 1; }
+
+      /* Indicateur worker dans la barre de statut */
+      .worker-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 8px; color: var(--t2); letter-spacing: .04em;
       }
-      .quality-sym-label {
-        font-family: var(--fd);
-        font-weight: 700;
-        color: var(--t1);
-        width: 40px;
-        flex-shrink: 0;
+      .worker-dot {
+        width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
       }
-      .quality-detail-text {
-        color: var(--t2);
-        font-size: 9px;
-        line-height: 1.5;
-        flex: 1;
-      }
+      .worker-dot.active   { background: var(--pos); box-shadow: 0 0 6px var(--pos); }
+      .worker-dot.fallback { background: #FFB400; }
+      .worker-dot.error    { background: var(--neg); }
     `;
     document.head.appendChild(style);
   }
@@ -370,17 +417,22 @@ const App = (() => {
     try {
       const useMock = state.mode === 'demo';
 
+      // 1. Récupération des séries temporelles (réseau / mock)
       state.seriesData = await API.fetchMultiple(
         assets,
         useMock,
-        (done, total, sym) => updateLoadingProgress(done, total, sym)
+        (done, total, sym) => updateLoadingProgress(done, total, `Données : ${sym} (${done}/${total})`)
       );
 
-      state.correlationMatrix = buildMatrix(assets, state.seriesData);
+      // 2. Construction de la matrice via Web Worker ──────────────────────
+      updateLoadingProgress(0, 1, 'Démarrage du calcul des corrélations…');
+      state.correlationMatrix = await buildMatrixAsync(assets, state.seriesData);
+
       state.lastUpdated = new Date();
 
       renderHeatmap();
       renderStats();
+      renderWorkerStatus();
     } catch (err) {
       renderError(err.message);
     } finally {
@@ -388,11 +440,13 @@ const App = (() => {
     }
   }
 
+  // ─── buildMatrixSync (fallback si Worker indisponible) ────────────────────
+
   /**
-   * Construit la matrice de corrélation (N*(N-1)/2 calculs).
-   * Passe désormais windowDays à Stats.analyze() pour le calcul de couverture.
+   * Version synchrone conservée comme fallback.
+   * Identique à la logique du worker mais s'exécute sur le thread principal.
    */
-  function buildMatrix(assets, seriesData) {
+  function buildMatrixSync(assets, seriesData) {
     const matrix = {};
 
     for (const sym of assets) {
@@ -414,7 +468,6 @@ const App = (() => {
           continue;
         }
 
-        // ── windowDays transmis pour le ratio de couverture ───────────────
         const result = Stats.analyze(
           series1, series2,
           API.ASSETS[sym1]?.label || sym1,
@@ -423,7 +476,6 @@ const App = (() => {
         );
 
         matrix[sym1][sym2] = result;
-
         matrix[sym2][sym1] = {
           ...result,
           label1:   result.label2,
@@ -436,12 +488,38 @@ const App = (() => {
           stdDevY:  result.stdDevX,
           meanRetX: result.meanRetY,
           meanRetY: result.meanRetX,
-          // quality : identique des deux côtés (la paire est symétrique)
         };
       }
     }
 
     return matrix;
+  }
+
+  // ─── Indicateur de statut du worker ──────────────────────────────────────
+
+  /**
+   * Affiche un badge discret dans la navbar indiquant si le worker est actif.
+   */
+  function renderWorkerStatus() {
+    // Retire un badge précédent éventuel
+    document.getElementById('worker-status-badge')?.remove();
+
+    const navActions = document.querySelector('.nav-actions');
+    if (!navActions) return;
+
+    const badge = document.createElement('div');
+    badge.id = 'worker-status-badge';
+    badge.className = 'worker-badge';
+
+    if (_workerFail) {
+      badge.innerHTML = `<span class="worker-dot fallback"></span>JS sync`;
+      badge.title = 'Web Worker indisponible — calcul synchrone (normal sur file://)';
+    } else {
+      badge.innerHTML = `<span class="worker-dot active"></span>Worker actif`;
+      badge.title = 'Calculs Pearson déportés sur un Web Worker (thread séparé)';
+    }
+
+    navActions.prepend(badge);
   }
 
   // ─── Tri ──────────────────────────────────────────────────────────────────
@@ -473,9 +551,6 @@ const App = (() => {
 
   // ─── Render Heatmap ───────────────────────────────────────────────────────
 
-  /**
-   * Retourne la classe CSS de qualité et l'attribut data-quality pour une cellule.
-   */
   function qualityCellAttrs(corr) {
     if (!corr || corr.isSelf || !corr.quality) return { cls: '', dataQuality: 'ok' };
 
@@ -500,12 +575,10 @@ const App = (() => {
 
     let html = `<div class="heatmap-grid" style="--cols:${n}">`;
 
-    // Coin
     html += `<div class="heatmap-cell corner-cell">
       <span class="corner-label">Asset →<br>↓ vs</span>
     </div>`;
 
-    // En-têtes colonnes
     for (const sym of assets) {
       const asset = API.ASSETS[sym];
       html += `<div class="heatmap-cell header-cell header-col" data-symbol="${sym}">
@@ -514,7 +587,6 @@ const App = (() => {
       </div>`;
     }
 
-    // Lignes
     for (const sym1 of assets) {
       const asset = API.ASSETS[sym1];
       html += `<div class="heatmap-cell header-cell header-row" data-symbol="${sym1}">
@@ -532,10 +604,8 @@ const App = (() => {
         const fg = Stats.correlationTextColor(r);
         const sig = corr?.significance || '';
 
-        // ── Qualité ───────────────────────────────────────────────────────
         const { cls: qualityCls, dataQuality } = qualityCellAttrs(corr);
 
-        // Tooltip enrichi avec info qualité
         const qualityTooltip = corr?.quality && !isSelf
           ? ` | ${corr.quality.detail}`
           : '';
@@ -553,7 +623,6 @@ const App = (() => {
 
     html += '</div>';
 
-    // Légende — avec section qualité ajoutée
     html += `<div class="heatmap-legend">
       <div class="legend-gradient"></div>
       <div class="legend-labels">
@@ -583,7 +652,6 @@ const App = (() => {
 
     container.innerHTML = html;
 
-    // Animation CSS
     const cells = container.querySelectorAll('.data-cell');
     cells.forEach((cell, i) => {
       cell.style.setProperty('--cell-delay', `${i * 12}ms`);
@@ -592,7 +660,6 @@ const App = (() => {
       container.querySelector('.heatmap-grid')?.classList.add('animate-in');
     });
 
-    // Interactivité
     container.querySelectorAll('.data-cell:not(.self-cell)').forEach(cell => {
       cell.addEventListener('click', () => {
         showDetailPanel(cell.dataset.sym1, cell.dataset.sym2);
@@ -620,9 +687,6 @@ const App = (() => {
 
   // ─── Detail Panel ─────────────────────────────────────────────────────────
 
-  /**
-   * Génère le HTML du bloc qualité pour le detail panel.
-   */
   function renderQualityBlock(corr, sym1, sym2) {
     if (!corr.quality) return '';
 
@@ -650,7 +714,6 @@ const App = (() => {
           <span class="quality-panel-title">Qualité des données</span>
           <span class="quality-badge ${badgeClass}">${flagLabels[q.flag] || q.flag}</span>
         </div>
-
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:8px;color:var(--t2);width:48px;flex-shrink:0;">Score</span>
           <div class="quality-score-track">
@@ -659,7 +722,6 @@ const App = (() => {
           </div>
           <span style="font-family:var(--fd);font-size:11px;font-weight:700;color:${scoreColor};min-width:32px;text-align:right;">${Math.round(q.score * 100)}%</span>
         </div>
-
         <div class="quality-row">
           <span class="quality-sym-label">${sym1}</span>
           <span class="quality-detail-text">${q.detailX || '—'}</span>
@@ -668,7 +730,6 @@ const App = (() => {
           <span class="quality-sym-label">${sym2}</span>
           <span class="quality-detail-text">${q.detailY || '—'}</span>
         </div>
-
         ${q.flag !== FLAG.OK ? `
           <div style="font-size:9px;color:rgba(255,180,0,.85);line-height:1.55;padding:6px 8px;background:rgba(255,180,0,.06);border-radius:var(--r1);border-left:2px solid rgba(255,180,0,.3);">
             Ce coefficient est calculé mais doit être interprété avec prudence. Les données présentent des anomalies qui peuvent biaiser r.
@@ -853,9 +914,9 @@ const App = (() => {
       </div>`;
   }
 
-  function updateLoadingProgress(done, total, sym) {
+  function updateLoadingProgress(done, total, label) {
     const el = document.getElementById('loading-progress');
-    if (el) el.textContent = `${sym} (${done}/${total})`;
+    if (el) el.textContent = label || `${done}/${total}`;
   }
 
   function renderError(msg) {
