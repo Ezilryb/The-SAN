@@ -2,12 +2,11 @@
  * THE SAN — Correlation Map Engine
  * Main application logic for the interactive heatmap
  *
- * Optimisations v2.1 :
- *  • buildMatrix : N*(N-1)/2 calculs (symétrie) au lieu de N²
- *  • Animation cellules : CSS custom-property + rAF unique
- *  • getSortedAssets : tri réellement appliqué au rendu
- *  • Bug --cols corrigé (assets.length, non +1)
- *  • Gestion fenêtre temporelle via pills seuls (select supprimé)
+ * v2.2 — Intégration de la validation qualité des données :
+ *   • Cellules hachurées pour données suspectes (LOW_VARIANCE, MANY_GAPS, LOW_COVERAGE)
+ *   • Badge qualité dans le detail panel
+ *   • buildMatrix() passe windowDays à Stats.analyze()
+ *   • Tooltip enrichi avec le rapport qualité
  */
 
 const App = (() => {
@@ -15,14 +14,14 @@ const App = (() => {
   // ─── State ────────────────────────────────────────────────────────────────
 
   let state = {
-    mode: 'demo',        // 'demo' | 'live'
+    mode: 'demo',
     selectedAssets: [],
     seriesData: {},
     correlationMatrix: {},
     isLoading: false,
     activeCell: null,
     sortBy: 'default',
-    window: 21,          // days (doit correspondre à la pill active dans le HTML)
+    window: 21,
     lastUpdated: null,
   };
 
@@ -33,6 +32,7 @@ const App = (() => {
   function init() {
     buildAssetSelector();
     setupEventListeners();
+    injectQualityStyles();
     loadState();
     renderModeToggle();
 
@@ -49,9 +49,9 @@ const App = (() => {
       if (saved) {
         const parsed = JSON.parse(saved);
         state.selectedAssets = parsed.selectedAssets || DEFAULT_ASSETS;
-        state.mode = parsed.mode || 'demo';
-        state.window = parsed.window || 21;
-        state.sortBy = parsed.sortBy || 'default';
+        state.mode  = parsed.mode   || 'demo';
+        state.window  = parsed.window  || 21;
+        state.sortBy  = parsed.sortBy  || 'default';
       }
     } catch (e) { /* ignore */ }
   }
@@ -65,6 +65,136 @@ const App = (() => {
         sortBy: state.sortBy,
       }));
     } catch (e) { /* ignore */ }
+  }
+
+  // ─── Styles qualité injectés dynamiquement ────────────────────────────────
+
+  /**
+   * Injecte les styles CSS pour les cellules de qualité dégradée.
+   * Séparés du style.css principal pour rester modulaires.
+   */
+  function injectQualityStyles() {
+    if (document.getElementById('san-quality-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'san-quality-styles';
+    style.textContent = `
+      /* ── Cellules données suspectes ── */
+
+      /* Hachures SVG encodées en base64 pour LOW_VARIANCE (série plate) */
+      .data-cell.quality-low-variance {
+        background-image: repeating-linear-gradient(
+          45deg,
+          rgba(255,180,0,0.08) 0px,
+          rgba(255,180,0,0.08) 2px,
+          transparent 2px,
+          transparent 8px
+        ) !important;
+        border-color: rgba(255,180,0,0.25) !important;
+      }
+
+      /* Pointillés pour MANY_GAPS (trous de liquidité) */
+      .data-cell.quality-many-gaps {
+        background-image: radial-gradient(
+          circle,
+          rgba(255,107,53,0.18) 1px,
+          transparent 1px
+        ) !important;
+        background-size: 6px 6px !important;
+        border-color: rgba(255,107,53,0.22) !important;
+      }
+
+      /* Grille fine pour LOW_COVERAGE (données insuffisantes) */
+      .data-cell.quality-low-coverage {
+        background-image:
+          linear-gradient(rgba(120,120,180,0.12) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(120,120,180,0.12) 1px, transparent 1px) !important;
+        background-size: 6px 6px !important;
+        border-color: rgba(120,120,180,0.28) !important;
+      }
+
+      /* Badge qualité commun */
+      .quality-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 9px;
+        border-radius: 10px;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        font-family: var(--fd);
+      }
+      .quality-badge.ok          { background: var(--posd); color: var(--pos); border: 1px solid rgba(29,219,126,.2); }
+      .quality-badge.warn        { background: rgba(255,180,0,.09); color: #FFB400; border: 1px solid rgba(255,180,0,.22); }
+      .quality-badge.bad         { background: var(--negd); color: var(--neg); border: 1px solid rgba(255,61,88,.22); }
+
+      /* Icône ⚠ superposée sur les cellules suspectes */
+      .data-cell[data-quality]:not([data-quality="ok"])::after {
+        content: '⚠';
+        position: absolute;
+        top: 2px;
+        right: 3px;
+        font-size: 7px;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      .data-cell { position: relative; }
+
+      /* Score qualité — barre dans le detail panel */
+      .quality-score-track {
+        flex: 1;
+        height: 4px;
+        background: var(--bg2);
+        border-radius: 2px;
+        overflow: hidden;
+        border: 1px solid var(--b0);
+      }
+      .quality-score-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width .9s var(--ease);
+      }
+
+      /* Encadré qualité dans le detail panel */
+      .quality-panel {
+        background: var(--bg2);
+        border: 1px solid var(--b0);
+        border-radius: var(--r1);
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .quality-panel-title {
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        color: var(--t2);
+      }
+      .quality-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 9px;
+      }
+      .quality-sym-label {
+        font-family: var(--fd);
+        font-weight: 700;
+        color: var(--t1);
+        width: 40px;
+        flex-shrink: 0;
+      }
+      .quality-detail-text {
+        color: var(--t2);
+        font-size: 9px;
+        line-height: 1.5;
+        flex: 1;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   // ─── Asset Selector ───────────────────────────────────────────────────────
@@ -114,7 +244,6 @@ const App = (() => {
   // ─── Event Listeners ──────────────────────────────────────────────────────
 
   function setupEventListeners() {
-    // Asset checkbox toggles
     document.addEventListener('change', e => {
       if (!e.target.classList.contains('asset-checkbox')) return;
       const sym = e.target.value;
@@ -128,11 +257,9 @@ const App = (() => {
       debouncedCompute();
     });
 
-    // Mode toggle
     document.getElementById('mode-demo')?.addEventListener('click', () => setMode('demo'));
     document.getElementById('mode-live')?.addEventListener('click', () => setMode('live'));
 
-    // API key
     document.getElementById('api-key-input')?.addEventListener('input', e => {
       API.setApiKey(e.target.value);
     });
@@ -145,12 +272,9 @@ const App = (() => {
       }
     });
 
-    // Refresh
     document.getElementById('btn-refresh')?.addEventListener('click', () => compute(true));
 
-    // Window pills (source de vérité — pas de select)
     document.querySelectorAll('.window-pill').forEach(pill => {
-      // Sync pill active state depuis state restauré
       if (parseInt(pill.dataset.days) === state.window) {
         document.querySelectorAll('.window-pill').forEach(p => {
           p.classList.toggle('active', p === pill);
@@ -169,16 +293,12 @@ const App = (() => {
       });
     });
 
-    // Sort
     document.getElementById('sort-select')?.addEventListener('change', e => {
       state.sortBy = e.target.value;
-      // Sync select value in case state was restored
-      e.target.value = state.sortBy;
       renderHeatmap();
       renderStats();
     });
 
-    // Close detail panel
     document.getElementById('detail-close')?.addEventListener('click', closeDetailPanel);
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeDetailPanel();
@@ -211,7 +331,6 @@ const App = (() => {
     const input = document.getElementById('api-key-input');
     if (input && API.getApiKey()) input.value = API.getApiKey();
 
-    // Sync info badge
     const badge = document.getElementById('info-mode-badge');
     if (badge) {
       if (state.mode === 'live') {
@@ -257,7 +376,6 @@ const App = (() => {
         (done, total, sym) => updateLoadingProgress(done, total, sym)
       );
 
-      // ── Matrice symétrique : N*(N-1)/2 calculs ──────────────────────────
       state.correlationMatrix = buildMatrix(assets, state.seriesData);
       state.lastUpdated = new Date();
 
@@ -271,19 +389,17 @@ const App = (() => {
   }
 
   /**
-   * Construit la matrice de corrélation en exploitant la symétrie.
-   * N*(N-1)/2 appels à Stats.analyze (au lieu de N²).
+   * Construit la matrice de corrélation (N*(N-1)/2 calculs).
+   * Passe désormais windowDays à Stats.analyze() pour le calcul de couverture.
    */
   function buildMatrix(assets, seriesData) {
     const matrix = {};
 
-    // Initialisation diagonale
     for (const sym of assets) {
       matrix[sym] = {};
       matrix[sym][sym] = { r: 1, p: 0, n: state.window, isSelf: true };
     }
 
-    // Triangle supérieur uniquement
     for (let i = 0; i < assets.length; i++) {
       for (let j = i + 1; j < assets.length; j++) {
         const sym1 = assets[i];
@@ -298,28 +414,29 @@ const App = (() => {
           continue;
         }
 
+        // ── windowDays transmis pour le ratio de couverture ───────────────
         const result = Stats.analyze(
           series1, series2,
           API.ASSETS[sym1]?.label || sym1,
-          API.ASSETS[sym2]?.label || sym2
+          API.ASSETS[sym2]?.label || sym2,
+          state.window,
         );
 
-        // Stockage direct
         matrix[sym1][sym2] = result;
 
-        // Miroir symétrique : on swape les axes X/Y
         matrix[sym2][sym1] = {
           ...result,
-          label1: result.label2,
-          label2: result.label1,
-          rawX: result.rawY,
-          rawY: result.rawX,
-          retX: result.retY,
-          retY: result.retX,
-          stdDevX: result.stdDevY,
-          stdDevY: result.stdDevX,
+          label1:   result.label2,
+          label2:   result.label1,
+          rawX:     result.rawY,
+          rawY:     result.rawX,
+          retX:     result.retY,
+          retY:     result.retX,
+          stdDevX:  result.stdDevY,
+          stdDevY:  result.stdDevX,
           meanRetX: result.meanRetY,
           meanRetY: result.meanRetX,
+          // quality : identique des deux côtés (la paire est symétrique)
         };
       }
     }
@@ -329,9 +446,6 @@ const App = (() => {
 
   // ─── Tri ──────────────────────────────────────────────────────────────────
 
-  /**
-   * Retourne la liste des actifs sélectionnés dans l'ordre de tri courant.
-   */
   function getSortedAssets() {
     const assets = [...state.selectedAssets];
     const matrix = state.correlationMatrix;
@@ -353,11 +467,28 @@ const App = (() => {
       }
 
       default:
-        return assets; // ordre de sélection
+        return assets;
     }
   }
 
   // ─── Render Heatmap ───────────────────────────────────────────────────────
+
+  /**
+   * Retourne la classe CSS de qualité et l'attribut data-quality pour une cellule.
+   */
+  function qualityCellAttrs(corr) {
+    if (!corr || corr.isSelf || !corr.quality) return { cls: '', dataQuality: 'ok' };
+
+    const flag = corr.quality.flag;
+    const FLAG = Stats.QUALITY_FLAGS;
+
+    switch (flag) {
+      case FLAG.LOW_VARIANCE:  return { cls: 'quality-low-variance',  dataQuality: flag };
+      case FLAG.MANY_GAPS:     return { cls: 'quality-many-gaps',     dataQuality: flag };
+      case FLAG.LOW_COVERAGE:  return { cls: 'quality-low-coverage',  dataQuality: flag };
+      default:                  return { cls: '',                       dataQuality: 'ok' };
+    }
+  }
 
   function renderHeatmap() {
     const container = document.getElementById('heatmap-container');
@@ -367,8 +498,6 @@ const App = (() => {
     const matrix = state.correlationMatrix;
     const n = assets.length;
 
-    // ── Construction HTML ────────────────────────────────────────────────
-    // --cols = assets.length (fix : était +1, créait une colonne fantôme)
     let html = `<div class="heatmap-grid" style="--cols:${n}">`;
 
     // Coin
@@ -399,14 +528,23 @@ const App = (() => {
         const isSelf = sym1 === sym2;
         const r = corr?.r ?? null;
         const rFmt = r !== null ? r.toFixed(3) : '—';
-        const bg = isSelf ? 'rgba(255,255,255,0.08)' : Stats.correlationColor(r);
+        const bg = isSelf ? 'rgba(255,255,255,0.08)' : Stats.correlationColor(r, corr?.quality?.flag);
         const fg = Stats.correlationTextColor(r);
         const sig = corr?.significance || '';
 
-        html += `<div class="heatmap-cell data-cell${isSelf ? ' self-cell' : ''}"
+        // ── Qualité ───────────────────────────────────────────────────────
+        const { cls: qualityCls, dataQuality } = qualityCellAttrs(corr);
+
+        // Tooltip enrichi avec info qualité
+        const qualityTooltip = corr?.quality && !isSelf
+          ? ` | ${corr.quality.detail}`
+          : '';
+
+        html += `<div class="heatmap-cell data-cell${isSelf ? ' self-cell' : ''} ${qualityCls}"
           style="background:${bg};color:${fg}"
           data-sym1="${sym1}" data-sym2="${sym2}"
-          title="${sym1} / ${sym2} : r = ${rFmt}">
+          data-quality="${dataQuality}"
+          title="${sym1} / ${sym2} : r = ${rFmt}${qualityTooltip}">
           <span class="cell-r">${isSelf ? '1.000' : rFmt}</span>
           ${!isSelf && sig ? `<span class="cell-sig">${sig}</span>` : ''}
         </div>`;
@@ -415,7 +553,7 @@ const App = (() => {
 
     html += '</div>';
 
-    // Légende
+    // Légende — avec section qualité ajoutée
     html += `<div class="heatmap-legend">
       <div class="legend-gradient"></div>
       <div class="legend-labels">
@@ -426,11 +564,26 @@ const App = (() => {
       <div class="legend-sig">
         Significativité : <b>***</b> p&lt;0.001 · <b>**</b> p&lt;0.01 · <b>*</b> p&lt;0.05 · <b>ns</b> non-signif.
       </div>
+      <div class="legend-sig" style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;">
+        <span>Qualité données :</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+          <span style="display:inline-block;width:14px;height:10px;background:repeating-linear-gradient(45deg,rgba(255,180,0,.18) 0px,rgba(255,180,0,.18) 2px,transparent 2px,transparent 8px);border:1px solid rgba(255,180,0,.3);border-radius:1px;"></span>
+          Variance faible
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+          <span style="display:inline-block;width:14px;height:10px;background:radial-gradient(circle,rgba(255,107,53,.25) 1px,transparent 1px) 0 0/6px 6px;border:1px solid rgba(255,107,53,.22);border-radius:1px;"></span>
+          Liquidité faible
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+          <span style="display:inline-block;width:14px;height:10px;background:linear-gradient(rgba(120,120,180,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(120,120,180,.18) 1px,transparent 1px);background-size:6px 6px;border:1px solid rgba(120,120,180,.28);border-radius:1px;"></span>
+          Couverture insuffisante
+        </span>
+      </div>
     </div>`;
 
     container.innerHTML = html;
 
-    // ── Animation CSS (rAF unique, pas de N² setTimeout) ─────────────────
+    // Animation CSS
     const cells = container.querySelectorAll('.data-cell');
     cells.forEach((cell, i) => {
       cell.style.setProperty('--cell-delay', `${i * 12}ms`);
@@ -439,7 +592,7 @@ const App = (() => {
       container.querySelector('.heatmap-grid')?.classList.add('animate-in');
     });
 
-    // ── Interactivité ────────────────────────────────────────────────────
+    // Interactivité
     container.querySelectorAll('.data-cell:not(.self-cell)').forEach(cell => {
       cell.addEventListener('click', () => {
         showDetailPanel(cell.dataset.sym1, cell.dataset.sym2);
@@ -466,6 +619,63 @@ const App = (() => {
   }
 
   // ─── Detail Panel ─────────────────────────────────────────────────────────
+
+  /**
+   * Génère le HTML du bloc qualité pour le detail panel.
+   */
+  function renderQualityBlock(corr, sym1, sym2) {
+    if (!corr.quality) return '';
+
+    const q = corr.quality;
+    const FLAG = Stats.QUALITY_FLAGS;
+
+    const scoreColor = q.score > 0.75 ? 'var(--pos)'
+                     : q.score > 0.40 ? '#FFB400'
+                     : 'var(--neg)';
+
+    const badgeClass = q.flag === FLAG.OK ? 'ok'
+                     : q.score > 0.40    ? 'warn'
+                     : 'bad';
+
+    const flagLabels = {
+      [FLAG.OK]:            '✓ Données fiables',
+      [FLAG.LOW_VARIANCE]:  '⚠ Variance faible',
+      [FLAG.MANY_GAPS]:     '⚠ Liquidité faible',
+      [FLAG.LOW_COVERAGE]:  '⚠ Couverture partielle',
+    };
+
+    return `
+      <div class="quality-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="quality-panel-title">Qualité des données</span>
+          <span class="quality-badge ${badgeClass}">${flagLabels[q.flag] || q.flag}</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:8px;color:var(--t2);width:48px;flex-shrink:0;">Score</span>
+          <div class="quality-score-track">
+            <div class="quality-score-fill"
+              style="width:${Math.round(q.score * 100)}%;background:${scoreColor};"></div>
+          </div>
+          <span style="font-family:var(--fd);font-size:11px;font-weight:700;color:${scoreColor};min-width:32px;text-align:right;">${Math.round(q.score * 100)}%</span>
+        </div>
+
+        <div class="quality-row">
+          <span class="quality-sym-label">${sym1}</span>
+          <span class="quality-detail-text">${q.detailX || '—'}</span>
+        </div>
+        <div class="quality-row">
+          <span class="quality-sym-label">${sym2}</span>
+          <span class="quality-detail-text">${q.detailY || '—'}</span>
+        </div>
+
+        ${q.flag !== FLAG.OK ? `
+          <div style="font-size:9px;color:rgba(255,180,0,.85);line-height:1.55;padding:6px 8px;background:rgba(255,180,0,.06);border-radius:var(--r1);border-left:2px solid rgba(255,180,0,.3);">
+            Ce coefficient est calculé mais doit être interprété avec prudence. Les données présentent des anomalies qui peuvent biaiser r.
+          </div>
+        ` : ''}
+      </div>`;
+  }
 
   function showDetailPanel(sym1, sym2) {
     const panel = document.getElementById('detail-panel');
@@ -548,6 +758,8 @@ const App = (() => {
 
       <div class="detail-interpretation">${interpretation}</div>
 
+      ${renderQualityBlock(corr, sym1, sym2)}
+
       <div class="detail-minibar">
         <div class="minibar-track">
           <div class="minibar-fill" style="
@@ -580,8 +792,8 @@ const App = (() => {
     let maxR = -Infinity, minR = Infinity;
     let maxPair = null, minPair = null;
     let pairs = 0, sigPairs = 0, sumR = 0;
+    let suspectPairs = 0;
 
-    // Itération triangle supérieur uniquement
     for (let i = 0; i < assets.length; i++) {
       for (let j = i + 1; j < assets.length; j++) {
         const corr = matrix[assets[i]]?.[assets[j]];
@@ -589,6 +801,7 @@ const App = (() => {
         pairs++;
         sumR += corr.r;
         if (corr.p != null && corr.p < 0.05) sigPairs++;
+        if (corr.quality && !corr.quality.isReliable) suspectPairs++;
         if (corr.r > maxR) { maxR = corr.r; maxPair = [assets[i], assets[j]]; }
         if (corr.r < minR) { minR = corr.r; minPair = [assets[i], assets[j]]; }
       }
@@ -620,9 +833,9 @@ const App = (() => {
         <div class="stat-card-value negative">${minPair ? minR.toFixed(3) : '—'}</div>
         <div class="stat-card-label">Min r ${minPair ? `(${minPair[0]}/${minPair[1]})` : ''}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-card-value">${state.window}j</div>
-        <div class="stat-card-label">Fenêtre temporelle</div>
+      <div class="stat-card" title="${suspectPairs} paire(s) avec données de qualité dégradée">
+        <div class="stat-card-value ${suspectPairs > 0 ? 'negative' : 'positive'}">${suspectPairs}</div>
+        <div class="stat-card-label">Données suspectes ⚠</div>
       </div>
     `;
   }
