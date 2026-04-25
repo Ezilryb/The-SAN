@@ -1,6 +1,13 @@
 /**
  * THE SAN — Correlation Map Engine
  * Main application logic for the interactive heatmap
+ *
+ * Optimisations v2.1 :
+ *  • buildMatrix : N*(N-1)/2 calculs (symétrie) au lieu de N²
+ *  • Animation cellules : CSS custom-property + rAF unique
+ *  • getSortedAssets : tri réellement appliqué au rendu
+ *  • Bug --cols corrigé (assets.length, non +1)
+ *  • Gestion fenêtre temporelle via pills seuls (select supprimé)
  */
 
 const App = (() => {
@@ -15,11 +22,10 @@ const App = (() => {
     isLoading: false,
     activeCell: null,
     sortBy: 'default',
-    window: 30,          // days
+    window: 21,          // days (doit correspondre à la pill active dans le HTML)
     lastUpdated: null,
   };
 
-  // Default asset selection
   const DEFAULT_ASSETS = ['LIT', 'TSLA', 'NVDA', 'GLD', 'URA', 'ENPH', 'CPER', 'QQQ'];
 
   // ─── Init ─────────────────────────────────────────────────────────────────
@@ -30,7 +36,6 @@ const App = (() => {
     loadState();
     renderModeToggle();
 
-    // Start with demo mode
     if (state.selectedAssets.length === 0) {
       state.selectedAssets = [...DEFAULT_ASSETS];
     }
@@ -45,6 +50,8 @@ const App = (() => {
         const parsed = JSON.parse(saved);
         state.selectedAssets = parsed.selectedAssets || DEFAULT_ASSETS;
         state.mode = parsed.mode || 'demo';
+        state.window = parsed.window || 21;
+        state.sortBy = parsed.sortBy || 'default';
       }
     } catch (e) { /* ignore */ }
   }
@@ -54,6 +61,8 @@ const App = (() => {
       localStorage.setItem('san_state', JSON.stringify({
         selectedAssets: state.selectedAssets,
         mode: state.mode,
+        window: state.window,
+        sortBy: state.sortBy,
       }));
     } catch (e) { /* ignore */ }
   }
@@ -110,9 +119,7 @@ const App = (() => {
       if (!e.target.classList.contains('asset-checkbox')) return;
       const sym = e.target.value;
       if (e.target.checked) {
-        if (!state.selectedAssets.includes(sym)) {
-          state.selectedAssets.push(sym);
-        }
+        if (!state.selectedAssets.includes(sym)) state.selectedAssets.push(sym);
       } else {
         state.selectedAssets = state.selectedAssets.filter(s => s !== sym);
       }
@@ -125,11 +132,10 @@ const App = (() => {
     document.getElementById('mode-demo')?.addEventListener('click', () => setMode('demo'));
     document.getElementById('mode-live')?.addEventListener('click', () => setMode('live'));
 
-    // API key input
+    // API key
     document.getElementById('api-key-input')?.addEventListener('input', e => {
       API.setApiKey(e.target.value);
     });
-
     document.getElementById('api-key-save')?.addEventListener('click', () => {
       const input = document.getElementById('api-key-input');
       if (input) {
@@ -139,31 +145,46 @@ const App = (() => {
       }
     });
 
-    // Refresh button
-    document.getElementById('btn-refresh')?.addEventListener('click', () => {
-      compute(true);
-    });
+    // Refresh
+    document.getElementById('btn-refresh')?.addEventListener('click', () => compute(true));
 
-    // Window size select
-    document.getElementById('window-select')?.addEventListener('change', e => {
-      state.window = parseInt(e.target.value);
-      compute();
+    // Window pills (source de vérité — pas de select)
+    document.querySelectorAll('.window-pill').forEach(pill => {
+      // Sync pill active state depuis state restauré
+      if (parseInt(pill.dataset.days) === state.window) {
+        document.querySelectorAll('.window-pill').forEach(p => {
+          p.classList.toggle('active', p === pill);
+          p.setAttribute('aria-pressed', p === pill ? 'true' : 'false');
+        });
+      }
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.window-pill').forEach(p => {
+          p.classList.remove('active');
+          p.setAttribute('aria-pressed', 'false');
+        });
+        pill.classList.add('active');
+        pill.setAttribute('aria-pressed', 'true');
+        state.window = parseInt(pill.dataset.days);
+        compute();
+      });
     });
 
     // Sort
     document.getElementById('sort-select')?.addEventListener('change', e => {
       state.sortBy = e.target.value;
+      // Sync select value in case state was restored
+      e.target.value = state.sortBy;
       renderHeatmap();
+      renderStats();
     });
 
     // Close detail panel
-    document.getElementById('detail-close')?.addEventListener('click', () => {
-      closeDetailPanel();
-    });
-
-    // Keyboard
+    document.getElementById('detail-close')?.addEventListener('click', closeDetailPanel);
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeDetailPanel();
+      if (e.key === 'r' && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT') {
+        compute(true);
+      }
     });
   }
 
@@ -178,18 +199,29 @@ const App = (() => {
     document.getElementById('mode-live')?.classList.toggle('active', state.mode === 'live');
 
     const apiPanel = document.getElementById('api-key-panel');
-    if (apiPanel) {
-      apiPanel.style.display = state.mode === 'live' ? 'flex' : 'none';
-    }
+    if (apiPanel) apiPanel.style.display = state.mode === 'live' ? 'flex' : 'none';
 
     const modeLabel = document.getElementById('mode-label');
     if (modeLabel) {
-      modeLabel.textContent = state.mode === 'demo' ? 'Mode Démo (données simulées)' : 'Mode Live (Alpha Vantage)';
+      modeLabel.textContent = state.mode === 'demo'
+        ? 'Mode Démo (données simulées)'
+        : 'Mode Live (Alpha Vantage)';
     }
 
-    // Pre-fill API key if saved
     const input = document.getElementById('api-key-input');
     if (input && API.getApiKey()) input.value = API.getApiKey();
+
+    // Sync info badge
+    const badge = document.getElementById('info-mode-badge');
+    if (badge) {
+      if (state.mode === 'live') {
+        badge.className = 'info-badge live';
+        badge.innerHTML = `<span style="width:4px;height:4px;border-radius:50%;background:rgba(255,140,70,.9);flex-shrink:0;" aria-hidden="true"></span> Mode Live`;
+      } else {
+        badge.className = 'info-badge demo';
+        badge.innerHTML = `<span class="status-dot" style="width:4px;height:4px;" aria-hidden="true"></span> Mode Démo`;
+      }
+    }
   }
 
   // ─── Compute ──────────────────────────────────────────────────────────────
@@ -217,20 +249,15 @@ const App = (() => {
     saveState();
 
     try {
-      // Fetch all series
       const useMock = state.mode === 'demo';
-      let loaded = 0;
 
       state.seriesData = await API.fetchMultiple(
         assets,
         useMock,
-        (done, total, sym) => {
-          loaded = done;
-          updateLoadingProgress(done, total, sym);
-        }
+        (done, total, sym) => updateLoadingProgress(done, total, sym)
       );
 
-      // Build correlation matrix
+      // ── Matrice symétrique : N*(N-1)/2 calculs ──────────────────────────
       state.correlationMatrix = buildMatrix(assets, state.seriesData);
       state.lastUpdated = new Date();
 
@@ -243,34 +270,91 @@ const App = (() => {
     }
   }
 
+  /**
+   * Construit la matrice de corrélation en exploitant la symétrie.
+   * N*(N-1)/2 appels à Stats.analyze (au lieu de N²).
+   */
   function buildMatrix(assets, seriesData) {
     const matrix = {};
 
-    for (const sym1 of assets) {
-      matrix[sym1] = {};
-      for (const sym2 of assets) {
-        if (sym1 === sym2) {
-          matrix[sym1][sym2] = { r: 1, p: 0, n: 30, isSelf: true };
-          continue;
-        }
+    // Initialisation diagonale
+    for (const sym of assets) {
+      matrix[sym] = {};
+      matrix[sym][sym] = { r: 1, p: 0, n: state.window, isSelf: true };
+    }
 
+    // Triangle supérieur uniquement
+    for (let i = 0; i < assets.length; i++) {
+      for (let j = i + 1; j < assets.length; j++) {
+        const sym1 = assets[i];
+        const sym2 = assets[j];
         const series1 = seriesData[sym1];
         const series2 = seriesData[sym2];
 
         if (!series1 || !series2) {
-          matrix[sym1][sym2] = { r: null, error: 'No data' };
+          const err = { r: null, error: 'No data' };
+          matrix[sym1][sym2] = err;
+          matrix[sym2][sym1] = err;
           continue;
         }
 
-        const result = Stats.analyze(series1, series2,
+        const result = Stats.analyze(
+          series1, series2,
           API.ASSETS[sym1]?.label || sym1,
           API.ASSETS[sym2]?.label || sym2
         );
+
+        // Stockage direct
         matrix[sym1][sym2] = result;
+
+        // Miroir symétrique : on swape les axes X/Y
+        matrix[sym2][sym1] = {
+          ...result,
+          label1: result.label2,
+          label2: result.label1,
+          rawX: result.rawY,
+          rawY: result.rawX,
+          retX: result.retY,
+          retY: result.retX,
+          stdDevX: result.stdDevY,
+          stdDevY: result.stdDevX,
+          meanRetX: result.meanRetY,
+          meanRetY: result.meanRetX,
+        };
       }
     }
 
     return matrix;
+  }
+
+  // ─── Tri ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Retourne la liste des actifs sélectionnés dans l'ordre de tri courant.
+   */
+  function getSortedAssets() {
+    const assets = [...state.selectedAssets];
+    const matrix = state.correlationMatrix;
+
+    switch (state.sortBy) {
+      case 'alpha':
+        return assets.sort((a, b) => a.localeCompare(b));
+
+      case 'avg-corr': {
+        const avg = sym => {
+          const row = matrix[sym];
+          if (!row) return 0;
+          const vals = Object.entries(row)
+            .filter(([k, v]) => k !== sym && v.r != null)
+            .map(([, v]) => Math.abs(v.r));
+          return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+        };
+        return assets.sort((a, b) => avg(b) - avg(a));
+      }
+
+      default:
+        return assets; // ordre de sélection
+    }
   }
 
   // ─── Render Heatmap ───────────────────────────────────────────────────────
@@ -279,18 +363,20 @@ const App = (() => {
     const container = document.getElementById('heatmap-container');
     if (!container) return;
 
-    const assets = state.selectedAssets;
+    const assets = getSortedAssets();
     const matrix = state.correlationMatrix;
+    const n = assets.length;
 
-    // Build the grid
-    let html = `<div class="heatmap-grid" style="--cols: ${assets.length + 1}">`;
+    // ── Construction HTML ────────────────────────────────────────────────
+    // --cols = assets.length (fix : était +1, créait une colonne fantôme)
+    let html = `<div class="heatmap-grid" style="--cols:${n}">`;
 
-    // Corner cell
+    // Coin
     html += `<div class="heatmap-cell corner-cell">
       <span class="corner-label">Asset →<br>↓ vs</span>
     </div>`;
 
-    // Column headers
+    // En-têtes colonnes
     for (const sym of assets) {
       const asset = API.ASSETS[sym];
       html += `<div class="heatmap-cell header-cell header-col" data-symbol="${sym}">
@@ -299,9 +385,8 @@ const App = (() => {
       </div>`;
     }
 
-    // Rows
+    // Lignes
     for (const sym1 of assets) {
-      // Row header
       const asset = API.ASSETS[sym1];
       html += `<div class="heatmap-cell header-cell header-row" data-symbol="${sym1}">
         <span class="header-icon">${asset?.icon || '📈'}</span>
@@ -309,21 +394,20 @@ const App = (() => {
         <span class="header-label">${asset?.label || sym1}</span>
       </div>`;
 
-      // Correlation cells
       for (const sym2 of assets) {
         const corr = matrix[sym1]?.[sym2];
         const isSelf = sym1 === sym2;
-        const r = corr?.r;
-        const rFormatted = r !== null ? r.toFixed(3) : '—';
-        const bgColor = isSelf ? 'rgba(255,255,255,0.08)' : Stats.correlationColor(r);
-        const textColor = Stats.correlationTextColor(r);
+        const r = corr?.r ?? null;
+        const rFmt = r !== null ? r.toFixed(3) : '—';
+        const bg = isSelf ? 'rgba(255,255,255,0.08)' : Stats.correlationColor(r);
+        const fg = Stats.correlationTextColor(r);
         const sig = corr?.significance || '';
 
-        html += `<div class="heatmap-cell data-cell ${isSelf ? 'self-cell' : ''}"
-          style="background: ${bgColor}; color: ${textColor}"
+        html += `<div class="heatmap-cell data-cell${isSelf ? ' self-cell' : ''}"
+          style="background:${bg};color:${fg}"
           data-sym1="${sym1}" data-sym2="${sym2}"
-          title="${sym1} vs ${sym2}: r = ${rFormatted}">
-          <span class="cell-r">${isSelf ? '1.000' : rFormatted}</span>
+          title="${sym1} / ${sym2} : r = ${rFmt}">
+          <span class="cell-r">${isSelf ? '1.000' : rFmt}</span>
           ${!isSelf && sig ? `<span class="cell-sig">${sig}</span>` : ''}
         </div>`;
       }
@@ -331,7 +415,7 @@ const App = (() => {
 
     html += '</div>';
 
-    // Legend
+    // Légende
     html += `<div class="heatmap-legend">
       <div class="legend-gradient"></div>
       <div class="legend-labels">
@@ -346,27 +430,22 @@ const App = (() => {
 
     container.innerHTML = html;
 
-    // Add click handlers for detail view
-    container.querySelectorAll('.data-cell:not(.self-cell)').forEach(cell => {
-      cell.addEventListener('click', () => {
-        const { sym1, sym2 } = cell.dataset;
-        showDetailPanel(sym1, sym2);
-      });
-      cell.addEventListener('mouseenter', () => highlightCross(cell));
-      cell.addEventListener('mouseleave', () => clearHighlight());
+    // ── Animation CSS (rAF unique, pas de N² setTimeout) ─────────────────
+    const cells = container.querySelectorAll('.data-cell');
+    cells.forEach((cell, i) => {
+      cell.style.setProperty('--cell-delay', `${i * 12}ms`);
+    });
+    requestAnimationFrame(() => {
+      container.querySelector('.heatmap-grid')?.classList.add('animate-in');
     });
 
-    // Animate in
-    requestAnimationFrame(() => {
-      container.querySelectorAll('.data-cell').forEach((cell, i) => {
-        cell.style.opacity = '0';
-        cell.style.transform = 'scale(0.8)';
-        setTimeout(() => {
-          cell.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-          cell.style.opacity = '1';
-          cell.style.transform = 'scale(1)';
-        }, i * 15);
+    // ── Interactivité ────────────────────────────────────────────────────
+    container.querySelectorAll('.data-cell:not(.self-cell)').forEach(cell => {
+      cell.addEventListener('click', () => {
+        showDetailPanel(cell.dataset.sym1, cell.dataset.sym2);
       });
+      cell.addEventListener('mouseenter', () => highlightCross(cell));
+      cell.addEventListener('mouseleave', clearHighlight);
     });
 
     updateTimestamp();
@@ -397,23 +476,24 @@ const App = (() => {
 
     const asset1 = API.ASSETS[sym1];
     const asset2 = API.ASSETS[sym2];
-
     const r = corr.r;
     const rDisplay = r !== null ? r.toFixed(4) : 'N/A';
     const pDisplay = corr.p !== null ? corr.p.toFixed(4) : 'N/A';
 
-    // Interpretation text
     let interpretation = '';
     if (r !== null) {
       const direction = r > 0 ? 'positive' : 'négative';
       const strength = corr.strength?.toLowerCase() || 'faible';
       const pSig = corr.p !== null && corr.p < 0.05;
-      interpretation = `La corrélation entre <strong>${asset1?.label || sym1}</strong> et <strong>${asset2?.label || sym2}</strong> est <strong>${direction} (${strength})</strong> sur les ${corr.n || 30} derniers jours de trading. ${pSig ? 'Ce résultat est <strong>statistiquement significatif</strong> (p < 0.05).' : 'Ce résultat n\'est <strong>pas statistiquement significatif</strong> (p ≥ 0.05).'}`;
-
+      interpretation = `La corrélation entre <strong>${asset1?.label || sym1}</strong> et <strong>${asset2?.label || sym2}</strong>
+        est <strong>${direction} (${strength})</strong> sur ${corr.n || state.window} jours.
+        ${pSig
+          ? 'Résultat <strong>statistiquement significatif</strong> (p &lt; 0.05).'
+          : 'Résultat <strong>non significatif</strong> (p ≥ 0.05).'}`;
       if (Math.abs(r) > 0.7) {
-        interpretation += ` Une corrélation ${direction} forte suggère que ces deux actifs tendent à évoluer ${r > 0 ? 'dans le même sens' : 'en sens opposé'}.`;
+        interpretation += ` Forte corrélation ${direction} : les actifs tendent à évoluer ${r > 0 ? 'dans le même sens' : 'en sens opposé'}.`;
       } else if (Math.abs(r) < 0.3) {
-        interpretation += ` La faible corrélation suggère que ces actifs évoluent de manière <strong>indépendante</strong> — potentiellement utile pour la diversification.`;
+        interpretation += ` Faible corrélation : évolution <strong>indépendante</strong> — potentiellement utile pour la diversification.`;
       }
     }
 
@@ -424,11 +504,11 @@ const App = (() => {
           <span class="detail-vs">↔</span>
           <span class="detail-asset">${asset2?.icon || '📈'} ${sym2}</span>
         </div>
-        <button class="detail-close-btn" id="detail-close">✕</button>
+        <button class="detail-close-btn" id="detail-close" aria-label="Fermer">✕</button>
       </div>
 
       <div class="detail-r-display">
-        <div class="r-value" style="color: ${r > 0 ? 'var(--cyan)' : r < 0 ? 'var(--amber)' : 'white'}">
+        <div class="r-value" style="color:${r > 0 ? 'var(--cyan)' : r < 0 ? 'var(--amber)' : 'white'}">
           ${rDisplay}
         </div>
         <div class="r-label">Coefficient de Pearson (r)</div>
@@ -454,11 +534,15 @@ const App = (() => {
         </div>
         <div class="detail-stat">
           <span class="stat-label">Rend. moy. ${sym1}</span>
-          <span class="stat-value ${corr.meanRetX >= 0 ? 'positive' : 'negative'}">${corr.meanRetX ? (corr.meanRetX * 100).toFixed(3) + '%' : '—'}</span>
+          <span class="stat-value ${corr.meanRetX >= 0 ? 'positive' : 'negative'}">
+            ${corr.meanRetX != null ? (corr.meanRetX * 100).toFixed(3) + '%' : '—'}
+          </span>
         </div>
         <div class="detail-stat">
           <span class="stat-label">Rend. moy. ${sym2}</span>
-          <span class="stat-value ${corr.meanRetY >= 0 ? 'positive' : 'negative'}">${corr.meanRetY ? (corr.meanRetY * 100).toFixed(3) + '%' : '—'}</span>
+          <span class="stat-value ${corr.meanRetY >= 0 ? 'positive' : 'negative'}">
+            ${corr.meanRetY != null ? (corr.meanRetY * 100).toFixed(3) + '%' : '—'}
+          </span>
         </div>
       </div>
 
@@ -467,9 +551,9 @@ const App = (() => {
       <div class="detail-minibar">
         <div class="minibar-track">
           <div class="minibar-fill" style="
-            left: ${r >= 0 ? '50%' : `${50 + r * 50}%`};
-            width: ${Math.abs(r) * 50}%;
-            background: ${r > 0 ? 'var(--cyan)' : 'var(--amber)'};
+            left:${r >= 0 ? '50%' : `${50 + r * 50}%`};
+            width:${Math.abs(r ?? 0) * 50}%;
+            background:${r > 0 ? 'var(--cyan)' : 'var(--amber)'};
           "></div>
           <div class="minibar-zero"></div>
         </div>
@@ -480,7 +564,6 @@ const App = (() => {
     `;
 
     panel.classList.add('open');
-
     document.getElementById('detail-close')?.addEventListener('click', closeDetailPanel);
   }
 
@@ -496,16 +579,16 @@ const App = (() => {
 
     let maxR = -Infinity, minR = Infinity;
     let maxPair = null, minPair = null;
-    let pairs = 0, sigPairs = 0;
-    let sumR = 0;
+    let pairs = 0, sigPairs = 0, sumR = 0;
 
+    // Itération triangle supérieur uniquement
     for (let i = 0; i < assets.length; i++) {
       for (let j = i + 1; j < assets.length; j++) {
         const corr = matrix[assets[i]]?.[assets[j]];
-        if (!corr || corr.r === null) continue;
+        if (!corr || corr.r == null) continue;
         pairs++;
         sumR += corr.r;
-        if (corr.p !== null && corr.p < 0.05) sigPairs++;
+        if (corr.p != null && corr.p < 0.05) sigPairs++;
         if (corr.r > maxR) { maxR = corr.r; maxPair = [assets[i], assets[j]]; }
         if (corr.r < minR) { minR = corr.r; minPair = [assets[i], assets[j]]; }
       }
@@ -544,7 +627,7 @@ const App = (() => {
     `;
   }
 
-  // ─── Loading / Error / Empty states ──────────────────────────────────────
+  // ─── Loading / Error / Empty states ───────────────────────────────────────
 
   function renderLoading() {
     const container = document.getElementById('heatmap-container');
@@ -552,8 +635,8 @@ const App = (() => {
     container.innerHTML = `
       <div class="state-container">
         <div class="loading-spinner"></div>
-        <div class="state-text">Chargement des données...</div>
-        <div class="loading-progress" id="loading-progress">Initialisation...</div>
+        <div class="state-text">Chargement des données…</div>
+        <div class="loading-progress" id="loading-progress">Initialisation…</div>
       </div>`;
   }
 

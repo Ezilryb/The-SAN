@@ -2,6 +2,7 @@
 <!--
   THE SAN — Sentiment Correlation Map
   Path: the-san/correlation-map.html
+  v2.1 — layout compressé, detail panel intégré, select fenêtre supprimé
 -->
 <html lang="fr">
 <head>
@@ -21,10 +22,11 @@
   <link rel="stylesheet" href="./css/style.css">
 
   <style>
+    /* ── Layout ── */
     .app-layout {
       display: grid;
-      grid-template-columns: 264px 1fr;
-      gap: 18px;
+      grid-template-columns: 248px 1fr;
+      gap: 16px;
       align-items: start;
     }
     .sidebar {
@@ -32,10 +34,48 @@
       top: 68px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
-    .main-content { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-    .sort-row { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    /* ── Heatmap cell animation (CSS-driven, un seul rAF) ── */
+    @keyframes cellIn {
+      from { opacity: 0; transform: scale(0.78); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .heatmap-grid.animate-in .data-cell {
+      animation: cellIn 0.26s cubic-bezier(0.16,1,0.3,1) var(--cell-delay, 0ms) both;
+    }
+
+    /* ── Detail panel intégré dans le flux ── */
+    #detail-panel {
+      /* Surcharge le style hors-flux du style.css global */
+      position: static !important;
+    }
+
+    /* ── Sidebar card compact ── */
+    .sidebar-card-body-sm { padding: 10px; }
+
+    /* ── Window pills row ── */
+    .window-pills-row {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-bottom: 2px;
+    }
+
+    /* ── Controls card merged ── */
+    .controls-merged { display: flex; flex-direction: column; gap: 10px; }
+
+    @media (max-width:1024px) {
+      .app-layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+    }
   </style>
 </head>
 <body>
@@ -70,11 +110,12 @@
       <!-- ── SIDEBAR ── -->
       <aside class="sidebar" role="complementary" aria-label="Contrôles">
 
+        <!-- Source -->
         <div class="sidebar-card">
           <div class="sidebar-card-header">
             <span class="sidebar-card-title">Source</span>
           </div>
-          <div class="sidebar-card-body">
+          <div class="sidebar-card-body sidebar-card-body-sm">
             <div class="mode-toggle" role="group" aria-label="Mode de données">
               <button id="mode-demo" class="mode-btn active" aria-pressed="true">Démo</button>
               <button id="mode-live" class="mode-btn" aria-pressed="false">Live API</button>
@@ -98,96 +139,95 @@
           </div>
         </div>
 
+        <!-- Fenêtre + Tri (fusionnés) -->
         <div class="sidebar-card">
           <div class="sidebar-card-header">
-            <span class="sidebar-card-title">Fenêtre temporelle</span>
+            <span class="sidebar-card-title">Fenêtre &amp; Tri</span>
           </div>
-          <div class="sidebar-card-body">
-            <div class="window-pills" role="group" aria-label="Fenêtre">
-              <button class="window-pill" data-days="7"  aria-pressed="false">7j</button>
-              <button class="window-pill" data-days="14" aria-pressed="false">14j</button>
-              <button class="window-pill active" data-days="21" aria-pressed="true">21j</button>
-              <button class="window-pill" data-days="30" aria-pressed="false">30j</button>
-              <button class="window-pill" data-days="35" aria-pressed="false">35j</button>
-            </div>
-            <div style="margin-top:9px;">
-              <select id="window-select" class="san-select" style="width:100%;" aria-label="Fenêtre en jours">
-                <option value="7">7 jours ouvrés</option>
-                <option value="14">14 jours ouvrés</option>
-                <option value="21" selected>21 jours ouvrés</option>
-                <option value="30">30 jours ouvrés</option>
-                <option value="35">35 jours ouvrés (max)</option>
-              </select>
+          <div class="sidebar-card-body sidebar-card-body-sm">
+            <div class="controls-merged">
+              <!-- Pills fenêtre — source de vérité (plus de select redondant) -->
+              <div>
+                <div class="control-label" style="margin-bottom:6px;">Fenêtre temporelle</div>
+                <div class="window-pills-row" role="group" aria-label="Fenêtre d'analyse">
+                  <button class="window-pill"        data-days="7"  aria-pressed="false">7j</button>
+                  <button class="window-pill"        data-days="14" aria-pressed="false">14j</button>
+                  <button class="window-pill active" data-days="21" aria-pressed="true" >21j</button>
+                  <button class="window-pill"        data-days="30" aria-pressed="false">30j</button>
+                  <button class="window-pill"        data-days="35" aria-pressed="false">35j</button>
+                </div>
+              </div>
+
+              <!-- Tri -->
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label for="sort-select" class="control-label" style="flex-shrink:0;white-space:nowrap;">Trier par</label>
+                <select id="sort-select" class="san-select" style="flex:1;" aria-label="Tri des actifs">
+                  <option value="default">Défaut</option>
+                  <option value="alpha">A → Z</option>
+                  <option value="avg-corr">Corrélation moy. ↓</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="sidebar-card">
-          <div class="sidebar-card-header">
-            <span class="sidebar-card-title">Tri &amp; Affichage</span>
-          </div>
-          <div class="sidebar-card-body">
-            <div class="sort-row">
-              <label for="sort-select" class="control-label" style="flex-shrink:0;">Trier par</label>
-              <select id="sort-select" class="san-select" style="flex:1;" aria-label="Tri des actifs">
-                <option value="default">Défaut (groupe)</option>
-                <option value="alpha">Alphabétique</option>
-                <option value="avg-corr">Corrélation moy.</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
+        <!-- Actifs + Refresh -->
         <div class="sidebar-card">
           <div class="sidebar-card-header">
             <span class="sidebar-card-title">Actifs sélectionnés</span>
             <span class="count-badge" id="selected-count" aria-label="Actifs sélectionnés">8</span>
           </div>
-          <div class="sidebar-card-body">
+          <div class="sidebar-card-body sidebar-card-body-sm">
             <button id="btn-refresh" class="btn-primary" style="width:100%;" aria-label="Recalculer">
               ⟳ &nbsp;Recalculer
             </button>
-            <div style="font-size:8px;color:var(--t2);margin-top:7px;line-height:1.5;text-align:center;">
-              Max 12 · Min 2 actifs<br>Calcul automatique
+            <div style="font-size:8px;color:var(--t2);margin-top:6px;line-height:1.5;text-align:center;">
+              Max 12 · Min 2 actifs · Calcul auto
             </div>
           </div>
         </div>
 
+        <!-- Univers d'actifs -->
         <div class="sidebar-card">
-          <div class="sidebar-card-header"><span class="sidebar-card-title">Univers d'actifs</span></div>
-          <div class="sidebar-card-body" style="padding:9px;">
+          <div class="sidebar-card-header">
+            <span class="sidebar-card-title">Univers d'actifs</span>
+          </div>
+          <div class="sidebar-card-body" style="padding:8px;">
             <div id="asset-selector" aria-label="Sélection des actifs"></div>
           </div>
         </div>
 
+        <!-- Légende compacte -->
         <div class="sidebar-card">
-          <div class="sidebar-card-header"><span class="sidebar-card-title">Légende</span></div>
-          <div class="sidebar-card-body">
+          <div class="sidebar-card-header">
+            <span class="sidebar-card-title">Légende</span>
+          </div>
+          <div class="sidebar-card-body sidebar-card-body-sm">
             <div style="display:flex;flex-direction:column;gap:5px;">
-              <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--t2);margin-bottom:1px;">
+              <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--t2);">
                 <span>Négative</span><span>Nulle</span><span>Positive</span>
               </div>
-              <div style="height:7px;border-radius:3px;background:linear-gradient(90deg,rgba(255,61,88,.85),rgba(255,255,255,.04),rgba(29,219,126,.85));"></div>
+              <div style="height:6px;border-radius:3px;background:linear-gradient(90deg,rgba(255,61,88,.85),rgba(255,255,255,.04),rgba(29,219,126,.85));"></div>
               <div style="display:flex;justify-content:space-between;font-family:var(--fm);font-size:8px;color:var(--t1);">
                 <span>−1.0</span><span>0.0</span><span>+1.0</span>
               </div>
             </div>
-            <div style="margin-top:10px;display:flex;flex-direction:column;gap:3px;">
+            <div style="margin-top:9px;display:flex;flex-direction:column;gap:3px;">
               <div style="display:flex;justify-content:space-between;font-size:8px;">
                 <span style="color:var(--t2);font-family:var(--fm);">*** p &lt; 0.001</span>
-                <span style="color:var(--t1);">Très significatif</span>
+                <span style="color:var(--t1);">Très signif.</span>
               </div>
               <div style="display:flex;justify-content:space-between;font-size:8px;">
-                <span style="color:var(--t2);font-family:var(--fm);">** p &lt; 0.01</span>
+                <span style="color:var(--t2);font-family:var(--fm);">** &nbsp;p &lt; 0.01</span>
                 <span style="color:var(--t1);">Significatif</span>
               </div>
               <div style="display:flex;justify-content:space-between;font-size:8px;">
-                <span style="color:var(--t2);font-family:var(--fm);">* p &lt; 0.05</span>
+                <span style="color:var(--t2);font-family:var(--fm);">* &nbsp;&nbsp;p &lt; 0.05</span>
                 <span style="color:var(--t1);">Marginalement</span>
               </div>
               <div style="display:flex;justify-content:space-between;font-size:8px;">
-                <span style="color:var(--t2);font-family:var(--fm);">ns p ≥ 0.05</span>
-                <span style="color:var(--t2);">Non significatif</span>
+                <span style="color:var(--t2);font-family:var(--fm);">ns &nbsp;&nbsp;p ≥ 0.05</span>
+                <span style="color:var(--t2);">Non signif.</span>
               </div>
             </div>
           </div>
@@ -197,8 +237,11 @@
 
       <!-- ── MAIN ── -->
       <div class="main-content">
+
+        <!-- Stat cards -->
         <div id="stats-summary" role="region" aria-label="Statistiques de la matrice"></div>
 
+        <!-- Info bar -->
         <div class="info-bar">
           <div class="info-bar-left">
             <span id="info-mode-badge" class="info-badge demo" aria-live="polite">
@@ -214,21 +257,27 @@
           </div>
         </div>
 
+        <!-- Heatmap -->
         <div class="heatmap-card" role="region" aria-label="Matrice de corrélation">
           <div class="heatmap-card-header">
             <div>
               <div class="heatmap-title">Matrice de Corrélation</div>
-              <div class="heatmap-meta" style="margin-top:3px;">Cliquez sur une cellule pour les détails statistiques</div>
+              <div class="heatmap-meta" style="margin-top:2px;">Cliquez sur une cellule pour les détails statistiques</div>
             </div>
           </div>
           <div id="heatmap-container" role="grid" aria-label="Heatmap de corrélation"></div>
         </div>
 
+        <!-- Detail panel — intégré dans le flux (plus hors-layout) -->
+        <div id="detail-panel" role="dialog" aria-modal="false"
+             aria-label="Détails de corrélation" aria-live="polite"></div>
+
+        <!-- Note méthodologique -->
         <div class="method-note" role="note">
           <strong>Méthodologie :</strong>
-          Le coefficient de Pearson est calculé sur les <code>rendements quotidiens</code>
-          (Δp/p), non sur les prix bruts. Données via
-          <code>TIME_SERIES_DAILY_ADJUSTED</code> (Alpha Vantage).
+          Pearson calculé sur les <code>rendements quotidiens</code> (Δp/p).
+          Matrice symétrique — N·(N−1)/2 calculs effectifs.
+          Données via <code>TIME_SERIES_DAILY_ADJUSTED</code> (Alpha Vantage).
           Mode démo : marche aléatoire reproductible par symbole.
         </div>
 
@@ -240,64 +289,17 @@
             Outil éducatif. Les corrélations historiques ne garantissent pas les performances futures.
           </div>
         </footer>
-      </div>
 
-    </div>
-  </div>
+      </div><!-- /main-content -->
 
-  <aside id="detail-panel" role="dialog" aria-modal="false"
-         aria-label="Détails de corrélation" aria-live="polite"></aside>
+    </div><!-- /app-layout -->
+  </div><!-- /page-wrapper -->
+
   <div id="toast" aria-live="polite"></div>
 
   <script src="./js/stats.js" defer></script>
   <script src="./js/api.js" defer></script>
   <script src="./js/app.js" defer></script>
 
-  <script defer>
-    document.addEventListener('DOMContentLoaded', () => {
-      // Sync window pills ↔ select
-      const pills = document.querySelectorAll('.window-pill');
-      const winSelect = document.getElementById('window-select');
-      pills.forEach(pill => {
-        pill.addEventListener('click', () => {
-          pills.forEach(p => { p.classList.remove('active'); p.setAttribute('aria-pressed','false'); });
-          pill.classList.add('active'); pill.setAttribute('aria-pressed','true');
-          if (winSelect) { winSelect.value = pill.dataset.days; winSelect.dispatchEvent(new Event('change')); }
-        });
-      });
-      if (winSelect) {
-        winSelect.addEventListener('change', () => {
-          const val = winSelect.value;
-          pills.forEach(p => {
-            const a = p.dataset.days === val;
-            p.classList.toggle('active', a);
-            p.setAttribute('aria-pressed', a ? 'true' : 'false');
-          });
-        });
-      }
-
-      // Mode badge
-      const modeBadge = document.getElementById('info-mode-badge');
-      function updateModeBadge(mode) {
-        if (!modeBadge) return;
-        if (mode === 'live') {
-          modeBadge.className = 'info-badge live';
-          modeBadge.innerHTML = `<span style="width:4px;height:4px;border-radius:50%;background:rgba(255,140,70,.9);flex-shrink:0;" aria-hidden="true"></span> Mode Live`;
-        } else {
-          modeBadge.className = 'info-badge demo';
-          modeBadge.innerHTML = `<span class="status-dot" style="width:4px;height:4px;" aria-hidden="true"></span> Mode Démo`;
-        }
-      }
-      document.getElementById('mode-demo')?.addEventListener('click', () => updateModeBadge('demo'));
-      document.getElementById('mode-live')?.addEventListener('click', () => updateModeBadge('live'));
-
-      // Keyboard shortcut
-      document.addEventListener('keydown', e => {
-        if (e.key === 'r' && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT') {
-          App?.compute(true);
-        }
-      });
-    });
-  </script>
 </body>
 </html>
