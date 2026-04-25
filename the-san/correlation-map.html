@@ -1,71 +1,59 @@
 <!DOCTYPE html>
 <!--
-  ╔═══════════════════════════════════════════════════════════════╗
-  ║  THE SAN — Sentiment Correlation Map                          ║
-  ║  Path: the-san/correlation-map.html                           ║
-  ╚═══════════════════════════════════════════════════════════════╝
+  THE SAN — Sentiment Correlation Map
+  Path: the-san/correlation-map.html
 -->
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#03050d" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#07080B">
   <title>Correlation Map — The SAN</title>
-  <meta name="description" content="Heatmap interactive de corrélations Pearson entre matières premières rares, EV, semi-conducteurs et énergie." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="./css/style.css" />
+  <meta name="description" content="Heatmap interactive de corrélations Pearson entre matières premières rares, EV, semi-conducteurs et énergie.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'"
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  </noscript>
+  <link rel="stylesheet" href="./css/style.css">
+
   <style>
-    .app-layout { display:grid; grid-template-columns:280px 1fr; gap:20px; align-items:start; }
-    @media (max-width:1024px) { .app-layout { grid-template-columns:1fr; } }
-    .sidebar { position:sticky; top:76px; display:flex; flex-direction:column; gap:12px; }
-    .sidebar-card { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden; }
-    .sidebar-card-header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border); }
-    .sidebar-card-title { font-family:var(--font-display); font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--text-muted); }
-    .sidebar-card-body { padding:14px; }
-    .window-pills { display:flex; gap:4px; flex-wrap:wrap; }
-    .window-pill { padding:4px 10px; font-family:var(--font-mono); font-size:10px; font-weight:500; background:var(--bg-deep); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-muted); cursor:pointer; transition:var(--transition); }
-    .window-pill.active { background:var(--cyan-dim); border-color:var(--border-bright); color:var(--cyan); }
-    .window-pill:hover:not(.active) { border-color:rgba(255,255,255,.12); color:var(--text-secondary); }
-    .sort-row { display:flex; align-items:center; gap:8px; margin-top:4px; }
-    .count-badge { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; background:var(--cyan-dim); color:var(--cyan); border:1px solid var(--border-bright); border-radius:50%; font-size:9px; font-weight:700; font-family:var(--font-display); }
-    .main-content { display:flex; flex-direction:column; gap:16px; min-width:0; }
-    .info-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:10px; color:var(--text-muted); padding:0 2px; flex-wrap:wrap; }
-    .info-bar-left { display:flex; align-items:center; gap:12px; }
-    .info-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:10px; font-size:9px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
-    .info-badge.demo { background:var(--green-dim); color:var(--green); border:1px solid rgba(0,255,135,.15); }
-    .info-badge.live { background:var(--amber-dim); color:var(--amber); border:1px solid rgba(255,107,53,.2); }
-    .legend-inline { display:flex; align-items:center; gap:8px; font-size:9px; color:var(--text-muted); }
-    .legend-gradient { width:80px; height:6px; border-radius:3px; background:linear-gradient(90deg,rgba(255,107,53,.9),rgba(255,255,255,.08),rgba(0,212,255,.9)); }
-    .method-note { background:var(--bg-surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 14px; font-size:10px; color:var(--text-muted); line-height:1.6; }
-    .method-note strong { color:var(--text-secondary); }
-    .method-note code { font-family:var(--font-mono); color:var(--cyan); background:var(--cyan-dim); padding:1px 5px; border-radius:2px; font-size:9px; }
-    .page-footer { display:flex; align-items:center; justify-content:space-between; padding:20px 0; border-top:1px solid var(--border); gap:16px; flex-wrap:wrap; }
-    .footer-brand { font-family:var(--font-display); font-size:11px; color:var(--text-muted); letter-spacing:.08em; }
-    .footer-disclaimer { font-size:9px; color:var(--text-faint); max-width:420px; line-height:1.5; }
-    @keyframes fade-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-    .page-header  { animation:fade-in .4s ease .05s both; }
-    .sidebar      { animation:fade-in .4s ease .1s  both; }
-    .main-content { animation:fade-in .4s ease .15s both; }
-    @media (max-width:768px) { .app-layout{gap:14px} .sidebar{position:static} .page-footer{flex-direction:column;gap:8px} .footer-disclaimer{text-align:center} }
+    .app-layout {
+      display: grid;
+      grid-template-columns: 264px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .sidebar {
+      position: sticky;
+      top: 68px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .main-content { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    .sort-row { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
   </style>
 </head>
 <body>
 
   <nav class="navbar" role="navigation" aria-label="Navigation principale">
-    <a href="./index.html" class="nav-brand" aria-label="THE SAN — Accueil">
+    <a href="./index.html" class="nav-brand" aria-label="THE SAN">
       <div class="nav-logo" aria-hidden="true">S</div>
-      <div class="nav-name">The <span>SAN</span></div>
+      <div class="nav-name">THE <span>SAN</span></div>
     </a>
     <div class="nav-links" role="list">
-      <a href="./index.html"            class="nav-link"        role="listitem">Accueil</a>
-      <a href="./correlation-map.html"  class="nav-link active" role="listitem">Correlation Map</a>
-      <a href="./sentiment-flow.html"   class="nav-link"        role="listitem">Sentiment Flow</a>
-      <a href="./macro-regime.html"     class="nav-link"        role="listitem">Macro Regime</a>
+      <a href="./index.html"           class="nav-link"        role="listitem">Accueil</a>
+      <a href="./correlation-map.html" class="nav-link active" role="listitem">Correlation Map</a>
+      <a href="./sentiment-flow.html"  class="nav-link"        role="listitem">Sentiment Flow</a>
+      <a href="./macro-regime.html"    class="nav-link"        role="listitem">Macro Regime</a>
     </div>
     <div class="nav-actions">
-      <div class="nav-status" aria-label="Mode de données actif" id="mode-label">Mode Démo (données simulées)</div>
-      <span id="last-updated" style="font-size:10px;color:var(--text-muted);"></span>
+      <div class="nav-status" id="mode-label">Mode Démo</div>
+      <span id="last-updated" style="font-size:9px;color:var(--t2);"></span>
     </div>
   </nav>
 
@@ -79,40 +67,51 @@
 
     <div class="app-layout">
 
-      <aside class="sidebar" role="complementary" aria-label="Contrôles et paramètres">
+      <!-- ── SIDEBAR ── -->
+      <aside class="sidebar" role="complementary" aria-label="Contrôles">
 
         <div class="sidebar-card">
-          <div class="sidebar-card-header"><span class="sidebar-card-title">Source de données</span></div>
+          <div class="sidebar-card-header">
+            <span class="sidebar-card-title">Source</span>
+          </div>
           <div class="sidebar-card-body">
             <div class="mode-toggle" role="group" aria-label="Mode de données">
               <button id="mode-demo" class="mode-btn active" aria-pressed="true">Démo</button>
               <button id="mode-live" class="mode-btn" aria-pressed="false">Live API</button>
             </div>
-            <div id="api-key-panel" class="api-key-panel" style="display:none;margin-top:12px;" aria-label="Configuration clé API Alpha Vantage">
-              <div style="width:100%;">
-                <div class="api-key-label">Clé Alpha Vantage&nbsp;<a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" style="color:var(--amber);font-size:9px;">→ Gratuite</a></div>
-                <div style="display:flex;gap:6px;margin-top:6px;">
-                  <input type="password" id="api-key-input" class="api-key-input" placeholder="Votre clé API…" autocomplete="off" spellcheck="false" aria-label="Clé API Alpha Vantage" style="flex:1;" />
-                  <button id="api-key-save" class="api-key-save" aria-label="Sauvegarder la clé API">Sauv.</button>
-                </div>
-                <div style="font-size:9px;color:var(--text-muted);margin-top:6px;line-height:1.5;">25 appels/jour gratuits · 5/minute.</div>
+            <div id="api-key-panel" style="display:none;margin-top:10px;" aria-label="Clé API Alpha Vantage">
+              <div class="api-key-label">
+                Clé Alpha Vantage&nbsp;
+                <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer"
+                   style="color:rgba(255,140,70,.8);font-size:8px;">→ Gratuite</a>
+              </div>
+              <div style="display:flex;gap:5px;margin-top:6px;">
+                <input type="password" id="api-key-input" class="api-key-input"
+                  placeholder="Votre clé API…" autocomplete="off" spellcheck="false"
+                  aria-label="Clé API Alpha Vantage" style="flex:1;">
+                <button id="api-key-save" class="api-key-save">Sauv.</button>
+              </div>
+              <div style="font-size:8px;color:var(--t2);margin-top:5px;line-height:1.5;">
+                25 appels/jour · 5/minute.
               </div>
             </div>
           </div>
         </div>
 
         <div class="sidebar-card">
-          <div class="sidebar-card-header"><span class="sidebar-card-title">Fenêtre temporelle</span></div>
+          <div class="sidebar-card-header">
+            <span class="sidebar-card-title">Fenêtre temporelle</span>
+          </div>
           <div class="sidebar-card-body">
-            <div class="window-pills" role="group" aria-label="Sélection de la fenêtre temporelle">
+            <div class="window-pills" role="group" aria-label="Fenêtre">
               <button class="window-pill" data-days="7"  aria-pressed="false">7j</button>
               <button class="window-pill" data-days="14" aria-pressed="false">14j</button>
               <button class="window-pill active" data-days="21" aria-pressed="true">21j</button>
               <button class="window-pill" data-days="30" aria-pressed="false">30j</button>
               <button class="window-pill" data-days="35" aria-pressed="false">35j</button>
             </div>
-            <div style="margin-top:10px;">
-              <select id="window-select" class="san-select" style="width:100%;" aria-label="Fenêtre temporelle en jours">
+            <div style="margin-top:9px;">
+              <select id="window-select" class="san-select" style="width:100%;" aria-label="Fenêtre en jours">
                 <option value="7">7 jours ouvrés</option>
                 <option value="14">14 jours ouvrés</option>
                 <option value="21" selected>21 jours ouvrés</option>
@@ -124,11 +123,13 @@
         </div>
 
         <div class="sidebar-card">
-          <div class="sidebar-card-header"><span class="sidebar-card-title">Tri &amp; Affichage</span></div>
+          <div class="sidebar-card-header">
+            <span class="sidebar-card-title">Tri &amp; Affichage</span>
+          </div>
           <div class="sidebar-card-body">
             <div class="sort-row">
               <label for="sort-select" class="control-label" style="flex-shrink:0;">Trier par</label>
-              <select id="sort-select" class="san-select" style="flex:1;" aria-label="Critère de tri des actifs">
+              <select id="sort-select" class="san-select" style="flex:1;" aria-label="Tri des actifs">
                 <option value="default">Défaut (groupe)</option>
                 <option value="alpha">Alphabétique</option>
                 <option value="avg-corr">Corrélation moy.</option>
@@ -140,63 +141,84 @@
         <div class="sidebar-card">
           <div class="sidebar-card-header">
             <span class="sidebar-card-title">Actifs sélectionnés</span>
-            <span class="count-badge" id="selected-count" aria-label="Nombre d'actifs sélectionnés">8</span>
+            <span class="count-badge" id="selected-count" aria-label="Actifs sélectionnés">8</span>
           </div>
-          <div class="sidebar-card-body" style="padding-top:10px;padding-bottom:10px;">
-            <button id="btn-refresh" class="btn-primary" style="width:100%;" aria-label="Recalculer la matrice">⟳ &nbsp;Recalculer</button>
-            <div style="font-size:9px;color:var(--text-muted);margin-top:8px;line-height:1.5;text-align:center;">Max 12 actifs · Min 2 actifs<br>Le calcul se lance automatiquement</div>
+          <div class="sidebar-card-body">
+            <button id="btn-refresh" class="btn-primary" style="width:100%;" aria-label="Recalculer">
+              ⟳ &nbsp;Recalculer
+            </button>
+            <div style="font-size:8px;color:var(--t2);margin-top:7px;line-height:1.5;text-align:center;">
+              Max 12 · Min 2 actifs<br>Calcul automatique
+            </div>
           </div>
         </div>
 
         <div class="sidebar-card">
           <div class="sidebar-card-header"><span class="sidebar-card-title">Univers d'actifs</span></div>
-          <div class="sidebar-card-body" style="padding:10px;">
-            <div id="asset-selector" aria-label="Sélection des actifs à analyser"></div>
+          <div class="sidebar-card-body" style="padding:9px;">
+            <div id="asset-selector" aria-label="Sélection des actifs"></div>
           </div>
         </div>
 
         <div class="sidebar-card">
-          <div class="sidebar-card-header"><span class="sidebar-card-title">Légende de corrélation</span></div>
+          <div class="sidebar-card-header"><span class="sidebar-card-title">Légende</span></div>
           <div class="sidebar-card-body">
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-bottom:2px;"><span>Forte négative</span><span>Nulle</span><span>Forte positive</span></div>
-              <div style="height:8px;border-radius:4px;background:linear-gradient(90deg,rgba(255,107,53,.9),rgba(255,255,255,.05),rgba(0,212,255,.9));"></div>
-              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:9px;color:var(--text-muted);"><span>−1.0</span><span>0.0</span><span>+1.0</span></div>
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--t2);margin-bottom:1px;">
+                <span>Négative</span><span>Nulle</span><span>Positive</span>
+              </div>
+              <div style="height:7px;border-radius:3px;background:linear-gradient(90deg,rgba(255,61,88,.85),rgba(255,255,255,.04),rgba(29,219,126,.85));"></div>
+              <div style="display:flex;justify-content:space-between;font-family:var(--fm);font-size:8px;color:var(--t1);">
+                <span>−1.0</span><span>0.0</span><span>+1.0</span>
+              </div>
             </div>
-            <div style="margin-top:12px;display:flex;flex-direction:column;gap:4px;">
-              <div style="display:flex;justify-content:space-between;font-size:9px;"><span style="color:var(--text-muted);">*** p &lt; 0.001</span><span style="color:var(--text-secondary);">Très significatif</span></div>
-              <div style="display:flex;justify-content:space-between;font-size:9px;"><span style="color:var(--text-muted);">** p &lt; 0.01</span><span style="color:var(--text-secondary);">Significatif</span></div>
-              <div style="display:flex;justify-content:space-between;font-size:9px;"><span style="color:var(--text-muted);">* p &lt; 0.05</span><span style="color:var(--text-secondary);">Marginalement sig.</span></div>
-              <div style="display:flex;justify-content:space-between;font-size:9px;"><span style="color:var(--text-muted);">ns p ≥ 0.05</span><span style="color:var(--text-muted);">Non significatif</span></div>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:3px;">
+              <div style="display:flex;justify-content:space-between;font-size:8px;">
+                <span style="color:var(--t2);font-family:var(--fm);">*** p &lt; 0.001</span>
+                <span style="color:var(--t1);">Très significatif</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:8px;">
+                <span style="color:var(--t2);font-family:var(--fm);">** p &lt; 0.01</span>
+                <span style="color:var(--t1);">Significatif</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:8px;">
+                <span style="color:var(--t2);font-family:var(--fm);">* p &lt; 0.05</span>
+                <span style="color:var(--t1);">Marginalement</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:8px;">
+                <span style="color:var(--t2);font-family:var(--fm);">ns p ≥ 0.05</span>
+                <span style="color:var(--t2);">Non significatif</span>
+              </div>
             </div>
           </div>
         </div>
 
       </aside>
 
+      <!-- ── MAIN ── -->
       <div class="main-content">
-        <div id="stats-summary" aria-label="Statistiques globales de la matrice" role="region"></div>
+        <div id="stats-summary" role="region" aria-label="Statistiques de la matrice"></div>
 
         <div class="info-bar">
           <div class="info-bar-left">
             <span id="info-mode-badge" class="info-badge demo" aria-live="polite">
-              <span class="status-dot" style="width:5px;height:5px;" aria-hidden="true"></span>
+              <span class="status-dot" style="width:4px;height:4px;" aria-hidden="true"></span>
               Mode Démo
             </span>
-            <span style="color:var(--text-faint);">Pearson r sur rendements quotidiens</span>
+            <span style="color:var(--t2);font-size:9px;">Pearson r · rendements quotidiens</span>
           </div>
           <div class="legend-inline" aria-hidden="true">
-            <span style="color:var(--amber);font-size:9px;">−1</span>
-            <div class="legend-gradient"></div>
-            <span style="color:var(--cyan);font-size:9px;">+1</span>
+            <span style="color:var(--neg);font-size:8px;">−1</span>
+            <div class="legend-inline-grad"></div>
+            <span style="color:var(--pos);font-size:8px;">+1</span>
           </div>
         </div>
 
-        <div class="heatmap-card" aria-label="Carte de corrélation interactive" role="region">
+        <div class="heatmap-card" role="region" aria-label="Matrice de corrélation">
           <div class="heatmap-card-header">
             <div>
               <div class="heatmap-title">Matrice de Corrélation</div>
-              <div class="heatmap-meta">Cliquez sur une cellule pour le détail statistique complet</div>
+              <div class="heatmap-meta" style="margin-top:3px;">Cliquez sur une cellule pour les détails statistiques</div>
             </div>
           </div>
           <div id="heatmap-container" role="grid" aria-label="Heatmap de corrélation"></div>
@@ -205,54 +227,77 @@
         <div class="method-note" role="note">
           <strong>Méthodologie :</strong>
           Le coefficient de Pearson est calculé sur les <code>rendements quotidiens</code>
-          (Δp/p), non sur les prix bruts. Les données proviennent de
-          <code>TIME_SERIES_DAILY_ADJUSTED</code> via Alpha Vantage.
-          En mode démo, une marche aléatoire avec dérive est utilisée (reproductible par symbole).
+          (Δp/p), non sur les prix bruts. Données via
+          <code>TIME_SERIES_DAILY_ADJUSTED</code> (Alpha Vantage).
+          Mode démo : marche aléatoire reproductible par symbole.
         </div>
 
         <footer class="page-footer" role="contentinfo">
-          <div class="footer-brand"><a href="./index.html" style="color:inherit;text-decoration:none;">THE SAN</a> &nbsp;·&nbsp; Correlation Map &nbsp;·&nbsp; 2026</div>
-          <div class="footer-disclaimer">Outil éducatif uniquement. Les corrélations historiques ne garantissent pas les performances futures. Aucun conseil en investissement.</div>
+          <div class="footer-brand">
+            <a href="./index.html">THE SAN</a> · Correlation Map · 2026
+          </div>
+          <div class="footer-disclaimer">
+            Outil éducatif. Les corrélations historiques ne garantissent pas les performances futures.
+          </div>
         </footer>
       </div>
 
     </div>
   </div>
 
-  <aside id="detail-panel" role="dialog" aria-modal="false" aria-label="Détails de corrélation" aria-live="polite"></aside>
+  <aside id="detail-panel" role="dialog" aria-modal="false"
+         aria-label="Détails de corrélation" aria-live="polite"></aside>
   <div id="toast" aria-live="polite"></div>
 
-  <script src="./js/stats.js"></script>
-  <script src="./js/api.js"></script>
-  <script src="./js/app.js"></script>
+  <script src="./js/stats.js" defer></script>
+  <script src="./js/api.js" defer></script>
+  <script src="./js/app.js" defer></script>
 
-  <script>
-    const pills = document.querySelectorAll('.window-pill');
-    const winSelect = document.getElementById('window-select');
-    pills.forEach(pill => {
-      pill.addEventListener('click', () => {
-        pills.forEach(p => { p.classList.remove('active'); p.setAttribute('aria-pressed','false'); });
-        pill.classList.add('active'); pill.setAttribute('aria-pressed','true');
-        if (winSelect) { winSelect.value = pill.dataset.days; winSelect.dispatchEvent(new Event('change')); }
+  <script defer>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Sync window pills ↔ select
+      const pills = document.querySelectorAll('.window-pill');
+      const winSelect = document.getElementById('window-select');
+      pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+          pills.forEach(p => { p.classList.remove('active'); p.setAttribute('aria-pressed','false'); });
+          pill.classList.add('active'); pill.setAttribute('aria-pressed','true');
+          if (winSelect) { winSelect.value = pill.dataset.days; winSelect.dispatchEvent(new Event('change')); }
+        });
+      });
+      if (winSelect) {
+        winSelect.addEventListener('change', () => {
+          const val = winSelect.value;
+          pills.forEach(p => {
+            const a = p.dataset.days === val;
+            p.classList.toggle('active', a);
+            p.setAttribute('aria-pressed', a ? 'true' : 'false');
+          });
+        });
+      }
+
+      // Mode badge
+      const modeBadge = document.getElementById('info-mode-badge');
+      function updateModeBadge(mode) {
+        if (!modeBadge) return;
+        if (mode === 'live') {
+          modeBadge.className = 'info-badge live';
+          modeBadge.innerHTML = `<span style="width:4px;height:4px;border-radius:50%;background:rgba(255,140,70,.9);flex-shrink:0;" aria-hidden="true"></span> Mode Live`;
+        } else {
+          modeBadge.className = 'info-badge demo';
+          modeBadge.innerHTML = `<span class="status-dot" style="width:4px;height:4px;" aria-hidden="true"></span> Mode Démo`;
+        }
+      }
+      document.getElementById('mode-demo')?.addEventListener('click', () => updateModeBadge('demo'));
+      document.getElementById('mode-live')?.addEventListener('click', () => updateModeBadge('live'));
+
+      // Keyboard shortcut
+      document.addEventListener('keydown', e => {
+        if (e.key === 'r' && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'INPUT') {
+          App?.compute(true);
+        }
       });
     });
-    if (winSelect) {
-      winSelect.addEventListener('change', () => {
-        const val = winSelect.value;
-        pills.forEach(p => { const a = p.dataset.days===val; p.classList.toggle('active',a); p.setAttribute('aria-pressed',a?'true':'false'); });
-      });
-    }
-    const demoBtnEl = document.getElementById('mode-demo');
-    const liveBtnEl = document.getElementById('mode-live');
-    const modeBadge = document.getElementById('info-mode-badge');
-    function updateModeBadge(mode) {
-      if (!modeBadge) return;
-      if (mode==='live') { modeBadge.className='info-badge live'; modeBadge.innerHTML=`<span style="width:5px;height:5px;border-radius:50%;background:var(--amber);box-shadow:0 0 6px var(--amber-glow);" aria-hidden="true"></span> Mode Live`; }
-      else { modeBadge.className='info-badge demo'; modeBadge.innerHTML=`<span class="status-dot" style="width:5px;height:5px;" aria-hidden="true"></span> Mode Démo`; }
-    }
-    demoBtnEl?.addEventListener('click', () => updateModeBadge('demo'));
-    liveBtnEl?.addEventListener('click', () => updateModeBadge('live'));
-    document.addEventListener('keydown', e => { if (e.key==='r' && !e.ctrlKey && !e.metaKey && e.target.tagName!=='INPUT') App.compute(true); });
   </script>
 </body>
 </html>
